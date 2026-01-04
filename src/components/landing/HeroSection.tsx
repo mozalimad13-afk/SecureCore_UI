@@ -5,8 +5,11 @@ import { Shield, Zap, ArrowRight } from 'lucide-react';
 
 export function HeroSection() {
   return (
-    <section className="relative min-h-screen flex items-center overflow-hidden">
-      <NetworkSphere />
+    <section id="hero" className="relative min-h-screen flex items-center overflow-hidden">
+      {/* 3D Network Sphere - positioned to the right */}
+      <div className="absolute right-0 top-0 w-full lg:w-2/3 h-full">
+        <NetworkSphere />
+      </div>
       
       <div className="container mx-auto px-4 pt-20 relative z-10">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
@@ -72,7 +75,7 @@ export function HeroSection() {
           </div>
           
           <div className="hidden lg:block">
-            {/* 3D visualization is in the background */}
+            {/* 3D visualization is in the background on the right */}
           </div>
         </div>
       </div>

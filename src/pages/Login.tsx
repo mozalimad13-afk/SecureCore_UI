@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Shield, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -14,28 +16,26 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Simulated login - will be replaced with actual auth
-    setTimeout(() => {
-      if (email === 'admin@securecore.com' && password === 'admin123') {
-        localStorage.setItem('userRole', 'admin');
-        localStorage.setItem('isAuthenticated', 'true');
+    const result = await login(email, password);
+    
+    if (result.success) {
+      if (result.role === 'admin') {
         toast({ title: 'Welcome Admin!', description: 'Redirecting to admin dashboard...' });
         navigate('/admin');
-      } else if (email && password) {
-        localStorage.setItem('userRole', 'user');
-        localStorage.setItem('isAuthenticated', 'true');
+      } else {
         toast({ title: 'Welcome back!', description: 'Redirecting to dashboard...' });
         navigate('/dashboard');
-      } else {
-        toast({ title: 'Error', description: 'Please enter valid credentials', variant: 'destructive' });
       }
-      setIsLoading(false);
-    }, 1000);
+    } else {
+      toast({ title: 'Error', description: 'Please enter valid credentials', variant: 'destructive' });
+    }
+    setIsLoading(false);
   };
 
   return (
@@ -83,8 +83,12 @@ export default function Login() {
                 </button>
               </div>
             </div>
-            <div className="flex items-center justify-between text-sm">
-              <Link to="/forgot-password" className="text-primary hover:underline">
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" className="rounded border-border" />
+                Remember me
+              </label>
+              <Link to="/forgot-password" className="text-sm text-primary hover:underline">
                 Forgot password?
               </Link>
             </div>
@@ -97,11 +101,6 @@ export default function Login() {
             <Link to="/register" className="text-primary hover:underline font-medium">
               Sign up
             </Link>
-          </div>
-          <div className="mt-4 p-3 rounded-lg bg-muted/50 text-xs text-muted-foreground">
-            <p className="font-medium mb-1">Demo credentials:</p>
-            <p>Admin: admin@securecore.com / admin123</p>
-            <p>User: any email / any password</p>
           </div>
         </CardContent>
       </Card>

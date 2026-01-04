@@ -6,17 +6,18 @@ import {
   Settings,
   FileText,
   LogOut,
-  CreditCard,
+  Bell,
   Activity
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
 
 const menuItems = [
   { icon: LayoutDashboard, label: 'Overview', href: '/admin' },
   { icon: Users, label: 'Users', href: '/admin/users' },
   { icon: Activity, label: 'System Health', href: '/admin/system' },
-  { icon: CreditCard, label: 'Subscriptions', href: '/admin/subscriptions' },
+  { icon: Bell, label: 'Notifications', href: '/admin/notifications' },
   { icon: FileText, label: 'Logs', href: '/admin/logs' },
   { icon: Settings, label: 'Settings', href: '/admin/settings' },
 ];
@@ -24,10 +25,10 @@ const menuItems = [
 export function AdminSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { logout } = useAuth();
 
   const handleLogout = () => {
-    localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('userRole');
+    logout();
     navigate('/');
   };
 
