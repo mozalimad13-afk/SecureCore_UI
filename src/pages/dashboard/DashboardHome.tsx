@@ -1,17 +1,18 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Shield, AlertTriangle, CheckCircle, Activity } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Shield, AlertTriangle, CheckCircle, Activity, Ban, ShieldCheck } from 'lucide-react';
 import { 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell 
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell 
 } from 'recharts';
+import { useToast } from '@/hooks/use-toast';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const statsData = [
   { title: 'Total Alerts Today', value: '127', icon: AlertTriangle, color: 'text-warning' },
@@ -53,6 +54,17 @@ const severityColors: Record<string, string> = {
 };
 
 export default function DashboardHome() {
+  const { toast } = useToast();
+  const navigate = useNavigate();
+
+  const handleAddToBlocklist = (ip: string) => {
+    toast({ title: 'Added to Blocklist', description: `${ip} has been added to your blocklist.` });
+  };
+
+  const handleAddToWhitelist = (ip: string) => {
+    toast({ title: 'Added to Whitelist', description: `${ip} has been added to your whitelist.` });
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -60,7 +72,6 @@ export default function DashboardHome() {
         <p className="text-muted-foreground">Here's what's happening with your network security.</p>
       </div>
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {statsData.map((stat, index) => (
           <Card key={index}>
@@ -79,7 +90,6 @@ export default function DashboardHome() {
         ))}
       </div>
 
-      {/* Charts Row */}
       <div className="grid lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">
           <CardHeader>
@@ -90,28 +100,11 @@ export default function DashboardHome() {
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={lineChartData}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="name" className="text-muted-foreground" />
-                  <YAxis className="text-muted-foreground" />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      border: '1px solid hsl(var(--border))' 
-                    }} 
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="alerts" 
-                    stroke="hsl(var(--primary))" 
-                    strokeWidth={2}
-                    dot={{ fill: 'hsl(var(--primary))' }}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="blocked" 
-                    stroke="hsl(var(--destructive))" 
-                    strokeWidth={2}
-                    dot={{ fill: 'hsl(var(--destructive))' }}
-                  />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} />
+                  <Line type="monotone" dataKey="alerts" stroke="hsl(var(--primary))" strokeWidth={2} />
+                  <Line type="monotone" dataKey="blocked" stroke="hsl(var(--destructive))" strokeWidth={2} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -126,15 +119,7 @@ export default function DashboardHome() {
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
+                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value">
                     {pieData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
@@ -155,7 +140,6 @@ export default function DashboardHome() {
         </Card>
       </div>
 
-      {/* Recent Alerts Table */}
       <Card>
         <CardHeader>
           <CardTitle>Recent Alerts</CardTitle>
@@ -169,6 +153,7 @@ export default function DashboardHome() {
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Type</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Severity</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Time</th>
+                  <th className="text-right py-3 px-4 font-medium text-muted-foreground">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -182,6 +167,23 @@ export default function DashboardHome() {
                       </span>
                     </td>
                     <td className="py-3 px-4 text-muted-foreground text-sm">{alert.time}</td>
+                    <td className="py-3 px-4 text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm">Add to List</Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleAddToBlocklist(alert.ip)}>
+                            <Ban className="w-4 h-4 mr-2" />
+                            Add to Blocklist
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleAddToWhitelist(alert.ip)}>
+                            <ShieldCheck className="w-4 h-4 mr-2" />
+                            Add to Whitelist
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
                   </tr>
                 ))}
               </tbody>
