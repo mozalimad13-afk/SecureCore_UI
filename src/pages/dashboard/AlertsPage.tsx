@@ -9,7 +9,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import { Search, Filter, Download, AlertTriangle } from 'lucide-react';
+import { Search, Filter, Download, AlertTriangle, Ban, ShieldCheck, MoreHorizontal } from 'lucide-react';
 import { 
   LineChart, 
   Line, 
@@ -19,6 +19,13 @@ import {
   Tooltip, 
   ResponsiveContainer 
 } from 'recharts';
+import { useToast } from '@/hooks/use-toast';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const hourlyData = Array.from({ length: 24 }, (_, i) => ({
   hour: `${i}:00`,
@@ -46,6 +53,7 @@ const severityColors: Record<string, string> = {
 export default function AlertsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [severityFilter, setSeverityFilter] = useState('all');
+  const { toast } = useToast();
 
   const filteredAlerts = alerts.filter(alert => {
     const matchesSearch = 
@@ -55,6 +63,14 @@ export default function AlertsPage() {
     const matchesSeverity = severityFilter === 'all' || alert.severity === severityFilter;
     return matchesSearch && matchesSeverity;
   });
+
+  const handleAddToBlocklist = (ip: string) => {
+    toast({ title: 'Added to Blocklist', description: `${ip} has been added to your blocklist.` });
+  };
+
+  const handleAddToWhitelist = (ip: string) => {
+    toast({ title: 'Added to Whitelist', description: `${ip} has been added to your whitelist.` });
+  };
 
   return (
     <div className="space-y-6">
@@ -147,6 +163,7 @@ export default function AlertsPage() {
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Protocol</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Severity</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Timestamp</th>
+                  <th className="text-right py-3 px-4 font-medium text-muted-foreground">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -163,6 +180,26 @@ export default function AlertsPage() {
                       </span>
                     </td>
                     <td className="py-3 px-4 text-muted-foreground text-sm">{alert.timestamp}</td>
+                    <td className="py-3 px-4 text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            <MoreHorizontal className="w-4 h-4 mr-2" />
+                            Add to List
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleAddToBlocklist(alert.ipSource)}>
+                            <Ban className="w-4 h-4 mr-2" />
+                            Add to Blocklist
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleAddToWhitelist(alert.ipSource)}>
+                            <ShieldCheck className="w-4 h-4 mr-2" />
+                            Add to Whitelist
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
                   </tr>
                 ))}
               </tbody>

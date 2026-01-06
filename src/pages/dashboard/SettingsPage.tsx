@@ -24,18 +24,82 @@ import {
   Sun
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useTheme } from '@/contexts/ThemeContext';
+import { useSettings } from '@/contexts/SettingsContext';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 export default function SettingsPage() {
-  const [theme, setTheme] = useState('system');
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  const [smsNotifications, setSmsNotifications] = useState(false);
-  const [webhookNotifications, setWebhookNotifications] = useState(true);
-  const [dailyDigest, setDailyDigest] = useState(true);
-  const [weeklyReport, setWeeklyReport] = useState(true);
+  const { theme, setTheme } = useTheme();
+  const { 
+    settings, 
+    updateSettings, 
+    addPaymentMethod, 
+    removePaymentMethod, 
+    setDefaultPaymentMethod,
+    runBackupNow,
+    cancelSubscription 
+  } = useSettings();
   const { toast } = useToast();
+  
+  const [newCard, setNewCard] = useState({ last4: '', expiry: '' });
+  const [isAddCardOpen, setIsAddCardOpen] = useState(false);
 
-  const handleSave = () => {
-    toast({ title: 'Settings saved', description: 'Your preferences have been updated.' });
+  const handleSavePreferences = () => {
+    toast({ title: 'Settings saved', description: 'Your theme preferences have been updated.' });
+  };
+
+  const handleSaveNotifications = () => {
+    toast({ title: 'Notifications saved', description: 'Your notification preferences have been updated.' });
+  };
+
+  const handleSaveReminders = () => {
+    toast({ title: 'Reminders saved', description: 'Your reminder preferences have been updated.' });
+  };
+
+  const handleSaveBackup = () => {
+    toast({ title: 'Backup settings saved', description: 'Your backup preferences have been updated.' });
+  };
+
+  const handleRunBackup = () => {
+    runBackupNow();
+    toast({ title: 'Backup started', description: 'Your data backup has been initiated.' });
+  };
+
+  const handleAddPaymentMethod = () => {
+    if (newCard.last4.length === 4 && newCard.expiry) {
+      addPaymentMethod({ last4: newCard.last4, expiry: newCard.expiry, isDefault: false });
+      setNewCard({ last4: '', expiry: '' });
+      setIsAddCardOpen(false);
+      toast({ title: 'Card added', description: 'Your new payment method has been added.' });
+    }
+  };
+
+  const handleCancelSubscription = () => {
+    cancelSubscription();
+    toast({ title: 'Subscription cancelled', description: 'Your subscription has been cancelled.' });
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleString();
   };
 
   return (
@@ -74,7 +138,7 @@ export default function SettingsPage() {
                   ].map((option) => (
                     <button
                       key={option.value}
-                      onClick={() => setTheme(option.value)}
+                      onClick={() => setTheme(option.value as 'light' | 'dark' | 'system')}
                       className={`p-4 rounded-lg border-2 transition-colors ${
                         theme === option.value 
                           ? 'border-primary bg-primary/5' 
@@ -87,7 +151,7 @@ export default function SettingsPage() {
                   ))}
                 </div>
               </div>
-              <Button onClick={handleSave}>Save Preferences</Button>
+              <Button onClick={handleSavePreferences}>Save Preferences</Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -107,23 +171,43 @@ export default function SettingsPage() {
                   <p className="font-medium">Email Notifications</p>
                   <p className="text-sm text-muted-foreground">Receive alerts via email</p>
                 </div>
-                <Switch checked={emailNotifications} onCheckedChange={setEmailNotifications} />
+                <Switch 
+                  checked={settings.emailNotifications} 
+                  onCheckedChange={(checked) => updateSettings({ emailNotifications: checked })} 
+                />
               </div>
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-medium">SMS Notifications</p>
                   <p className="text-sm text-muted-foreground">Receive critical alerts via SMS</p>
                 </div>
-                <Switch checked={smsNotifications} onCheckedChange={setSmsNotifications} />
+                <Switch 
+                  checked={settings.smsNotifications} 
+                  onCheckedChange={(checked) => updateSettings({ smsNotifications: checked })} 
+                />
               </div>
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-medium">Webhook Notifications</p>
                   <p className="text-sm text-muted-foreground">Send alerts to your webhook endpoint</p>
                 </div>
-                <Switch checked={webhookNotifications} onCheckedChange={setWebhookNotifications} />
+                <Switch 
+                  checked={settings.webhookNotifications} 
+                  onCheckedChange={(checked) => updateSettings({ webhookNotifications: checked })} 
+                />
               </div>
-              <Button onClick={handleSave}>Save Notifications</Button>
+              {settings.webhookNotifications && (
+                <div className="space-y-2">
+                  <Label htmlFor="webhookUrl">Webhook URL</Label>
+                  <Input
+                    id="webhookUrl"
+                    value={settings.webhookUrl}
+                    onChange={(e) => updateSettings({ webhookUrl: e.target.value })}
+                    placeholder="https://your-webhook-endpoint.com/alerts"
+                  />
+                </div>
+              )}
+              <Button onClick={handleSaveNotifications}>Save Notifications</Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -143,18 +227,27 @@ export default function SettingsPage() {
                   <p className="font-medium">Daily Digest</p>
                   <p className="text-sm text-muted-foreground">Receive a daily summary of alerts</p>
                 </div>
-                <Switch checked={dailyDigest} onCheckedChange={setDailyDigest} />
+                <Switch 
+                  checked={settings.dailyDigest} 
+                  onCheckedChange={(checked) => updateSettings({ dailyDigest: checked })} 
+                />
               </div>
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-medium">Weekly Security Report</p>
                   <p className="text-sm text-muted-foreground">Get a comprehensive weekly report</p>
                 </div>
-                <Switch checked={weeklyReport} onCheckedChange={setWeeklyReport} />
+                <Switch 
+                  checked={settings.weeklyReport} 
+                  onCheckedChange={(checked) => updateSettings({ weeklyReport: checked })} 
+                />
               </div>
               <div className="space-y-2">
                 <Label>Digest Time</Label>
-                <Select defaultValue="09:00">
+                <Select 
+                  value={settings.digestTime} 
+                  onValueChange={(value) => updateSettings({ digestTime: value })}
+                >
                   <SelectTrigger className="w-[200px]">
                     <SelectValue placeholder="Select time" />
                   </SelectTrigger>
@@ -166,7 +259,7 @@ export default function SettingsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <Button onClick={handleSave}>Save Reminders</Button>
+              <Button onClick={handleSaveReminders}>Save Reminders</Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -183,7 +276,10 @@ export default function SettingsPage() {
             <CardContent className="space-y-6">
               <div className="space-y-2">
                 <Label>Backup Frequency</Label>
-                <Select defaultValue="daily">
+                <Select 
+                  value={settings.backupFrequency} 
+                  onValueChange={(value: 'hourly' | 'daily' | 'weekly' | 'monthly') => updateSettings({ backupFrequency: value })}
+                >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select frequency" />
                   </SelectTrigger>
@@ -198,16 +294,16 @@ export default function SettingsPage() {
               <div className="p-4 rounded-lg bg-muted/50 border border-border">
                 <div className="flex justify-between items-center mb-2">
                   <span className="font-medium">Last Backup</span>
-                  <span className="text-sm text-muted-foreground">2024-01-15 02:00:00</span>
+                  <span className="text-sm text-muted-foreground">{formatDate(settings.lastBackup)}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="font-medium">Next Scheduled</span>
-                  <span className="text-sm text-muted-foreground">2024-01-16 02:00:00</span>
+                  <span className="text-sm text-muted-foreground">{formatDate(settings.nextBackup)}</span>
                 </div>
               </div>
               <div className="flex gap-4">
-                <Button onClick={handleSave}>Save Settings</Button>
-                <Button variant="outline">Run Backup Now</Button>
+                <Button onClick={handleSaveBackup}>Save Settings</Button>
+                <Button variant="outline" onClick={handleRunBackup}>Run Backup Now</Button>
               </div>
             </CardContent>
           </Card>
@@ -226,42 +322,128 @@ export default function SettingsPage() {
               <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <p className="font-semibold text-lg">Small Companies Plan</p>
-                    <p className="text-sm text-muted-foreground">$44/month</p>
+                    <p className="font-semibold text-lg">{settings.plan} Plan</p>
+                    <p className="text-sm text-muted-foreground">{settings.planPrice}</p>
                   </div>
-                  <span className="px-3 py-1 bg-success/10 text-success text-sm rounded-full">Active</span>
+                  <span className={`px-3 py-1 text-sm rounded-full ${settings.plan === 'Cancelled' ? 'bg-destructive/10 text-destructive' : 'bg-success/10 text-success'}`}>
+                    {settings.plan === 'Cancelled' ? 'Cancelled' : 'Active'}
+                  </span>
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  <p>Next billing date: February 15, 2024</p>
+                  <p>Next billing date: {settings.nextBillingDate}</p>
                 </div>
               </div>
 
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <Label className="text-base">Payment Methods</Label>
-                  <Button variant="outline" size="sm">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add New
-                  </Button>
+                  <Dialog open={isAddCardOpen} onOpenChange={setIsAddCardOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add New
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Add Payment Method</DialogTitle>
+                        <DialogDescription>Add a new credit card to your account.</DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="last4">Last 4 digits of card</Label>
+                          <Input
+                            id="last4"
+                            placeholder="4242"
+                            maxLength={4}
+                            value={newCard.last4}
+                            onChange={(e) => setNewCard({ ...newCard, last4: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="expiry">Expiry date</Label>
+                          <Input
+                            id="expiry"
+                            placeholder="MM/YYYY"
+                            value={newCard.expiry}
+                            onChange={(e) => setNewCard({ ...newCard, expiry: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsAddCardOpen(false)}>Cancel</Button>
+                        <Button onClick={handleAddPaymentMethod}>Add Card</Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </div>
-                <div className="p-4 rounded-lg border border-border flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-8 bg-muted rounded flex items-center justify-center">
-                      <CreditCard className="w-5 h-5" />
+                
+                {settings.paymentMethods.map((method) => (
+                  <div key={method.id} className="p-4 rounded-lg border border-border flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-8 bg-muted rounded flex items-center justify-center">
+                        <CreditCard className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="font-medium">•••• •••• •••• {method.last4}</p>
+                        <p className="text-sm text-muted-foreground">Expires {method.expiry}</p>
+                      </div>
+                      {method.isDefault && (
+                        <span className="px-2 py-1 bg-primary/10 text-primary text-xs rounded-full">Default</span>
+                      )}
                     </div>
-                    <div>
-                      <p className="font-medium">•••• •••• •••• 4242</p>
-                      <p className="text-sm text-muted-foreground">Expires 12/2025</p>
+                    <div className="flex items-center gap-2">
+                      {!method.isDefault && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => {
+                            setDefaultPaymentMethod(method.id);
+                            toast({ title: 'Default card updated' });
+                          }}
+                        >
+                          Set Default
+                        </Button>
+                      )}
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-destructive"
+                        onClick={() => {
+                          removePaymentMethod(method.id);
+                          toast({ title: 'Card removed' });
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     </div>
                   </div>
-                  <Button variant="ghost" size="sm" className="text-destructive">
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
+                ))}
               </div>
 
               <div className="pt-4 border-t border-border">
-                <Button variant="destructive">Cancel Subscription</Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" disabled={settings.plan === 'Cancelled'}>
+                      Cancel Subscription
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Cancel Subscription?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This action will cancel your subscription at the end of your current billing period. 
+                        You will lose access to premium features.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Keep Subscription</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleCancelSubscription}>
+                        Yes, Cancel
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             </CardContent>
           </Card>
