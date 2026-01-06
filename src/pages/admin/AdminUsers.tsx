@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { 
   Select, 
   SelectContent, 
@@ -17,7 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Search, MoreHorizontal, Ban, Mail, Eye, UserCog } from 'lucide-react';
+import { Search, MoreHorizontal, Ban, Mail, Eye, UserCog, CheckCircle, CreditCard } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,15 +28,33 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 
-const users = [
-  { id: 1, name: 'John Smith', email: 'john@techcorp.com', company: 'TechCorp', plan: 'Enterprise', status: 'Active', alerts: 1247, joined: '2023-06-15' },
-  { id: 2, name: 'Sarah Johnson', email: 'sarah@dataflow.io', company: 'DataFlow', plan: 'Small Companies', status: 'Active', alerts: 856, joined: '2023-08-22' },
-  { id: 3, name: 'Mike Chen', email: 'mike@securenet.com', company: 'SecureNet', plan: 'Enterprise', status: 'Trial', alerts: 342, joined: '2024-01-05' },
-  { id: 4, name: 'Emily Davis', email: 'emily@cloudguard.co', company: 'CloudGuard', plan: 'Small Companies', status: 'Active', alerts: 1589, joined: '2023-04-10' },
-  { id: 5, name: 'Alex Wilson', email: 'alex@startup.io', company: 'StartupIO', plan: 'Free Trial', status: 'Trial', alerts: 124, joined: '2024-01-12' },
-  { id: 6, name: 'Lisa Brown', email: 'lisa@enterprise.com', company: 'Enterprise Inc', plan: 'Enterprise', status: 'Suspended', alerts: 0, joined: '2023-02-28' },
-  { id: 7, name: 'Tom Anderson', email: 'tom@security.net', company: 'SecurityNet', plan: 'Small Companies', status: 'Active', alerts: 2341, joined: '2023-05-17' },
-  { id: 8, name: 'Jane Miller', email: 'jane@protect.io', company: 'Protect.io', plan: 'Enterprise', status: 'Active', alerts: 4521, joined: '2022-11-03' },
+interface User {
+  id: number;
+  name: string;
+  email: string;
+  company: string;
+  plan: string;
+  status: 'Active' | 'Trial' | 'Suspended' | 'Expired';
+  alerts: number;
+  joined: string;
+  paymentInfo: {
+    cardLast4: string;
+    cardExpiry: string;
+    billingAddress: string;
+    lastPayment: string;
+    nextPayment: string;
+  };
+}
+
+const initialUsers: User[] = [
+  { id: 1, name: 'John Smith', email: 'john@techcorp.com', company: 'TechCorp', plan: 'Enterprise', status: 'Active', alerts: 1247, joined: '2023-06-15', paymentInfo: { cardLast4: '4242', cardExpiry: '12/2025', billingAddress: '123 Tech St, SF CA', lastPayment: '2024-01-01', nextPayment: '2024-02-01' } },
+  { id: 2, name: 'Sarah Johnson', email: 'sarah@dataflow.io', company: 'DataFlow', plan: 'Small Companies', status: 'Active', alerts: 856, joined: '2023-08-22', paymentInfo: { cardLast4: '5555', cardExpiry: '08/2026', billingAddress: '456 Data Ave, NYC NY', lastPayment: '2024-01-05', nextPayment: '2024-02-05' } },
+  { id: 3, name: 'Mike Chen', email: 'mike@securenet.com', company: 'SecureNet', plan: 'Enterprise', status: 'Trial', alerts: 342, joined: '2024-01-05', paymentInfo: { cardLast4: '1234', cardExpiry: '03/2027', billingAddress: '789 Secure Blvd, LA CA', lastPayment: 'N/A', nextPayment: '2024-01-19' } },
+  { id: 4, name: 'Emily Davis', email: 'emily@cloudguard.co', company: 'CloudGuard', plan: 'Small Companies', status: 'Active', alerts: 1589, joined: '2023-04-10', paymentInfo: { cardLast4: '9876', cardExpiry: '11/2025', billingAddress: '321 Cloud Ln, Seattle WA', lastPayment: '2024-01-10', nextPayment: '2024-02-10' } },
+  { id: 5, name: 'Alex Wilson', email: 'alex@startup.io', company: 'StartupIO', plan: 'Free Trial', status: 'Trial', alerts: 124, joined: '2024-01-12', paymentInfo: { cardLast4: '6789', cardExpiry: '05/2026', billingAddress: '555 Startup Way, Austin TX', lastPayment: 'N/A', nextPayment: '2024-01-26' } },
+  { id: 6, name: 'Lisa Brown', email: 'lisa@enterprise.com', company: 'Enterprise Inc', plan: 'Enterprise', status: 'Suspended', alerts: 0, joined: '2023-02-28', paymentInfo: { cardLast4: '4321', cardExpiry: '09/2024', billingAddress: '999 Enterprise Dr, Chicago IL', lastPayment: '2023-12-28', nextPayment: 'Suspended' } },
+  { id: 7, name: 'Tom Anderson', email: 'tom@security.net', company: 'SecurityNet', plan: 'Small Companies', status: 'Active', alerts: 2341, joined: '2023-05-17', paymentInfo: { cardLast4: '8765', cardExpiry: '07/2026', billingAddress: '777 Security Rd, Boston MA', lastPayment: '2024-01-17', nextPayment: '2024-02-17' } },
+  { id: 8, name: 'Jane Miller', email: 'jane@protect.io', company: 'Protect.io', plan: 'Enterprise', status: 'Active', alerts: 4521, joined: '2022-11-03', paymentInfo: { cardLast4: '2468', cardExpiry: '02/2027', billingAddress: '888 Protect Pkwy, Denver CO', lastPayment: '2024-01-03', nextPayment: '2024-02-03' } },
 ];
 
 const statusColors: Record<string, string> = {
@@ -45,10 +65,14 @@ const statusColors: Record<string, string> = {
 };
 
 export default function AdminUsers() {
+  const [users, setUsers] = useState<User[]>(initialUsers);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [selectedUser, setSelectedUser] = useState<typeof users[0] | null>(null);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isViewOpen, setIsViewOpen] = useState(false);
+  const [isEmailOpen, setIsEmailOpen] = useState(false);
+  const [emailData, setEmailData] = useState({ subject: '', message: '' });
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
   const { toast } = useToast();
 
   const filteredUsers = users.filter(user => {
@@ -60,21 +84,36 @@ export default function AdminUsers() {
     return matchesSearch && matchesStatus;
   });
 
-  const handleAction = (action: string, user: typeof users[0]) => {
-    switch (action) {
-      case 'view':
-        setSelectedUser(user);
-        setIsViewOpen(true);
-        break;
-      case 'suspend':
-        toast({ title: 'User Suspended', description: `${user.name} has been suspended.` });
-        break;
-      case 'email':
-        toast({ title: 'Email Sent', description: `Email sent to ${user.email}.` });
-        break;
-      default:
-        break;
+  const handleToggleStatus = (user: User) => {
+    const newStatus = user.status === 'Suspended' ? 'Active' : 'Suspended';
+    setUsers(users.map(u => 
+      u.id === user.id ? { ...u, status: newStatus as 'Active' | 'Suspended' } : u
+    ));
+    toast({ 
+      title: newStatus === 'Active' ? 'User Activated' : 'User Suspended', 
+      description: `${user.name} has been ${newStatus === 'Active' ? 'activated' : 'suspended'}.` 
+    });
+  };
+
+  const handleOpenEmail = (user: User) => {
+    setSelectedUser(user);
+    setEmailData({ subject: '', message: '' });
+    setIsEmailOpen(true);
+  };
+
+  const handleSendEmail = () => {
+    if (!emailData.subject || !emailData.message) {
+      toast({ title: 'Error', description: 'Please fill in all fields', variant: 'destructive' });
+      return;
     }
+    
+    setIsSendingEmail(true);
+    setTimeout(() => {
+      toast({ title: 'Email Sent', description: `Email sent to ${selectedUser?.email}.` });
+      setIsEmailOpen(false);
+      setEmailData({ subject: '', message: '' });
+      setIsSendingEmail(false);
+    }, 1000);
   };
 
   return (
@@ -149,17 +188,29 @@ export default function AdminUsers() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleAction('view', user)}>
+                          <DropdownMenuItem onClick={() => { setSelectedUser(user); setIsViewOpen(true); }}>
                             <Eye className="w-4 h-4 mr-2" />
                             View Details
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleAction('email', user)}>
+                          <DropdownMenuItem onClick={() => handleOpenEmail(user)}>
                             <Mail className="w-4 h-4 mr-2" />
                             Send Email
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleAction('suspend', user)} className="text-destructive">
-                            <Ban className="w-4 h-4 mr-2" />
-                            Suspend
+                          <DropdownMenuItem 
+                            onClick={() => handleToggleStatus(user)} 
+                            className={user.status === 'Suspended' ? 'text-success' : 'text-destructive'}
+                          >
+                            {user.status === 'Suspended' ? (
+                              <>
+                                <CheckCircle className="w-4 h-4 mr-2" />
+                                Activate
+                              </>
+                            ) : (
+                              <>
+                                <Ban className="w-4 h-4 mr-2" />
+                                Suspend
+                              </>
+                            )}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -174,7 +225,7 @@ export default function AdminUsers() {
 
       {/* User Details Dialog */}
       <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <UserCog className="w-5 h-5" />
@@ -182,7 +233,7 @@ export default function AdminUsers() {
             </DialogTitle>
           </DialogHeader>
           {selectedUser && (
-            <div className="space-y-4 py-4">
+            <div className="space-y-6 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Name</p>
@@ -211,20 +262,93 @@ export default function AdminUsers() {
                   <p className="font-medium">{selectedUser.joined}</p>
                 </div>
               </div>
+              
               <div className="p-4 rounded-lg bg-muted/50">
                 <p className="text-sm text-muted-foreground">Total Alerts Generated</p>
                 <p className="text-2xl font-bold">{selectedUser.alerts.toLocaleString()}</p>
+              </div>
+
+              {/* Payment Information */}
+              <div className="space-y-4">
+                <h4 className="font-semibold flex items-center gap-2">
+                  <CreditCard className="w-4 h-4" />
+                  Payment Information
+                </h4>
+                <div className="grid grid-cols-2 gap-4 p-4 rounded-lg border border-border">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Card</p>
+                    <p className="font-medium">•••• •••• •••• {selectedUser.paymentInfo.cardLast4}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Expiry</p>
+                    <p className="font-medium">{selectedUser.paymentInfo.cardExpiry}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Billing Address</p>
+                    <p className="font-medium">{selectedUser.paymentInfo.billingAddress}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Last Payment</p>
+                    <p className="font-medium">{selectedUser.paymentInfo.lastPayment}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-sm text-muted-foreground">Next Payment</p>
+                    <p className="font-medium">{selectedUser.paymentInfo.nextPayment}</p>
+                  </div>
+                </div>
               </div>
             </div>
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsViewOpen(false)}>Close</Button>
             <Button onClick={() => {
-              handleAction('email', selectedUser!);
               setIsViewOpen(false);
+              handleOpenEmail(selectedUser!);
             }}>
               <Mail className="w-4 h-4 mr-2" />
               Send Email
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Send Email Dialog */}
+      <Dialog open={isEmailOpen} onOpenChange={setIsEmailOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="w-5 h-5" />
+              Send Email to {selectedUser?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Send an email to {selectedUser?.email}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="subject">Subject</Label>
+              <Input
+                id="subject"
+                placeholder="Enter email subject..."
+                value={emailData.subject}
+                onChange={(e) => setEmailData({ ...emailData, subject: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="message">Message</Label>
+              <Textarea
+                id="message"
+                placeholder="Enter your message..."
+                value={emailData.message}
+                onChange={(e) => setEmailData({ ...emailData, message: e.target.value })}
+                rows={6}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEmailOpen(false)}>Cancel</Button>
+            <Button onClick={handleSendEmail} disabled={isSendingEmail}>
+              {isSendingEmail ? 'Sending...' : 'Send Email'}
             </Button>
           </DialogFooter>
         </DialogContent>

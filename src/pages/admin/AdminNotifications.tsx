@@ -1,28 +1,26 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Bell, Send, Users, User, Clock, CheckCircle } from 'lucide-react';
+import { Bell, Send, Users, User, Clock, CheckCircle, Search, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
-const users = [
+const allUsers = [
   { id: '1', name: 'John Smith', email: 'john@techcorp.com', company: 'TechCorp' },
   { id: '2', name: 'Sarah Johnson', email: 'sarah@dataflow.io', company: 'DataFlow' },
   { id: '3', name: 'Mike Chen', email: 'mike@securenet.com', company: 'SecureNet' },
   { id: '4', name: 'Emily Davis', email: 'emily@cloudguard.co', company: 'CloudGuard' },
   { id: '5', name: 'Alex Wilson', email: 'alex@startup.io', company: 'StartupIO' },
+  { id: '6', name: 'Lisa Brown', email: 'lisa@enterprise.com', company: 'Enterprise Inc' },
+  { id: '7', name: 'Tom Anderson', email: 'tom@security.net', company: 'SecurityNet' },
+  { id: '8', name: 'Jane Miller', email: 'jane@protect.io', company: 'Protect.io' },
+  { id: '9', name: 'David Lee', email: 'david@cyberguard.com', company: 'CyberGuard' },
+  { id: '10', name: 'Anna White', email: 'anna@safezone.io', company: 'SafeZone' },
 ];
 
 const sentNotifications = [
@@ -33,18 +31,39 @@ const sentNotifications = [
 
 export default function AdminNotifications() {
   const [notificationType, setNotificationType] = useState<'all' | 'single' | 'selected'>('all');
-  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-  const [singleUserId, setSingleUserId] = useState('');
+  const [selectedUsers, setSelectedUsers] = useState<typeof allUsers>([]);
+  const [singleUser, setSingleUser] = useState<typeof allUsers[0] | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const { toast } = useToast();
 
-  const handleUserSelection = (userId: string, checked: boolean) => {
-    if (checked) {
-      setSelectedUsers([...selectedUsers, userId]);
+  const filteredUsers = useMemo(() => {
+    return allUsers.filter(user =>
+      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.company.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [searchTerm]);
+
+  const handleSelectUser = (user: typeof allUsers[0]) => {
+    if (notificationType === 'single') {
+      setSingleUser(user);
+      setSearchTerm('');
     } else {
-      setSelectedUsers(selectedUsers.filter(id => id !== userId));
+      if (!selectedUsers.find(u => u.id === user.id)) {
+        setSelectedUsers([...selectedUsers, user]);
+      }
+      setSearchTerm('');
+    }
+  };
+
+  const handleRemoveUser = (userId: string) => {
+    if (notificationType === 'single') {
+      setSingleUser(null);
+    } else {
+      setSelectedUsers(selectedUsers.filter(u => u.id !== userId));
     }
   };
 
@@ -54,7 +73,7 @@ export default function AdminNotifications() {
       return;
     }
 
-    if (notificationType === 'single' && !singleUserId) {
+    if (notificationType === 'single' && !singleUser) {
       toast({ title: 'Error', description: 'Please select a user', variant: 'destructive' });
       return;
     }
@@ -72,8 +91,7 @@ export default function AdminNotifications() {
           targetDescription = 'all users';
           break;
         case 'single':
-          const user = users.find(u => u.id === singleUserId);
-          targetDescription = user?.name || 'selected user';
+          targetDescription = singleUser?.name || 'selected user';
           break;
         case 'selected':
           targetDescription = `${selectedUsers.length} users`;
@@ -87,7 +105,7 @@ export default function AdminNotifications() {
       setTitle('');
       setMessage('');
       setSelectedUsers([]);
-      setSingleUserId('');
+      setSingleUser(null);
       setIsSending(false);
     }, 1500);
   };
@@ -121,7 +139,7 @@ export default function AdminNotifications() {
                 <div className="flex gap-4">
                   <Button
                     variant={notificationType === 'all' ? 'default' : 'outline'}
-                    onClick={() => setNotificationType('all')}
+                    onClick={() => { setNotificationType('all'); setSelectedUsers([]); setSingleUser(null); }}
                     className="flex items-center gap-2"
                   >
                     <Users className="w-4 h-4" />
@@ -129,7 +147,7 @@ export default function AdminNotifications() {
                   </Button>
                   <Button
                     variant={notificationType === 'single' ? 'default' : 'outline'}
-                    onClick={() => setNotificationType('single')}
+                    onClick={() => { setNotificationType('single'); setSelectedUsers([]); }}
                     className="flex items-center gap-2"
                   >
                     <User className="w-4 h-4" />
@@ -137,7 +155,7 @@ export default function AdminNotifications() {
                   </Button>
                   <Button
                     variant={notificationType === 'selected' ? 'default' : 'outline'}
-                    onClick={() => setNotificationType('selected')}
+                    onClick={() => { setNotificationType('selected'); setSingleUser(null); }}
                     className="flex items-center gap-2"
                   >
                     <CheckCircle className="w-4 h-4" />
@@ -146,44 +164,83 @@ export default function AdminNotifications() {
                 </div>
               </div>
 
-              {/* Single User Selection */}
-              {notificationType === 'single' && (
-                <div className="space-y-2">
-                  <Label>Select User</Label>
-                  <Select value={singleUserId} onValueChange={setSingleUserId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose a user" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {users.map(user => (
-                        <SelectItem key={user.id} value={user.id}>
-                          {user.name} - {user.email}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {/* Multiple User Selection */}
-              {notificationType === 'selected' && (
-                <div className="space-y-2">
-                  <Label>Select Users ({selectedUsers.length} selected)</Label>
-                  <div className="border border-border rounded-lg p-4 max-h-48 overflow-y-auto space-y-3">
-                    {users.map(user => (
-                      <div key={user.id} className="flex items-center space-x-3">
-                        <Checkbox
-                          id={user.id}
-                          checked={selectedUsers.includes(user.id)}
-                          onCheckedChange={(checked) => handleUserSelection(user.id, checked as boolean)}
-                        />
-                        <label htmlFor={user.id} className="text-sm cursor-pointer flex-1">
-                          <span className="font-medium">{user.name}</span>
-                          <span className="text-muted-foreground ml-2">({user.company})</span>
-                        </label>
+              {/* User Search - for Single or Selected */}
+              {(notificationType === 'single' || notificationType === 'selected') && (
+                <div className="space-y-4">
+                  <Label>
+                    {notificationType === 'single' ? 'Select User' : `Select Users (${selectedUsers.length} selected)`}
+                  </Label>
+                  
+                  {/* Selected Users Display */}
+                  {notificationType === 'single' && singleUser && (
+                    <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg">
+                      <div className="flex-1">
+                        <span className="font-medium">{singleUser.name}</span>
+                        <span className="text-muted-foreground ml-2">({singleUser.email})</span>
                       </div>
-                    ))}
-                  </div>
+                      <Button variant="ghost" size="sm" onClick={() => handleRemoveUser(singleUser.id)}>
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  )}
+
+                  {notificationType === 'selected' && selectedUsers.length > 0 && (
+                    <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg">
+                      {selectedUsers.map(user => (
+                        <Badge key={user.id} variant="secondary" className="flex items-center gap-1 pr-1">
+                          {user.name}
+                          <button 
+                            onClick={() => handleRemoveUser(user.id)}
+                            className="ml-1 hover:bg-muted rounded-full p-0.5"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Search Input */}
+                  {(notificationType === 'selected' || (notificationType === 'single' && !singleUser)) && (
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search users by name, email, or company..."
+                        className="pl-10"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                      
+                      {/* Search Results Dropdown */}
+                      {searchTerm && (
+                        <Card className="absolute z-10 w-full mt-1 shadow-lg">
+                          <ScrollArea className="max-h-64">
+                            {filteredUsers.length > 0 ? (
+                              <div className="p-1">
+                                {filteredUsers.map(user => (
+                                  <button
+                                    key={user.id}
+                                    onClick={() => handleSelectUser(user)}
+                                    disabled={selectedUsers.find(u => u.id === user.id) !== undefined}
+                                    className={`w-full text-left px-3 py-2 rounded-md hover:bg-muted transition-colors ${
+                                      selectedUsers.find(u => u.id === user.id) ? 'opacity-50 cursor-not-allowed' : ''
+                                    }`}
+                                  >
+                                    <p className="font-medium">{user.name}</p>
+                                    <p className="text-sm text-muted-foreground">{user.email} • {user.company}</p>
+                                  </button>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="p-4 text-center text-muted-foreground">
+                                No users found
+                              </div>
+                            )}
+                          </ScrollArea>
+                        </Card>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
