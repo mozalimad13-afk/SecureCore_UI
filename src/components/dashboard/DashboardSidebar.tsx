@@ -21,6 +21,7 @@ const menuItems = [
   { icon: FileText, label: 'Reports', href: '/dashboard/reports' },
   { icon: Ban, label: 'Block List', href: '/dashboard/blocklist' },
   { icon: CheckCircle, label: 'White List', href: '/dashboard/whitelist' },
+  { icon: Bell, label: 'Notifications', href: '/dashboard/notifications' },
   { icon: Settings, label: 'Settings', href: '/dashboard/settings' },
   { icon: Download, label: 'Downloads', href: '/dashboard/downloads' },
 ];

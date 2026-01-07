@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import { Bell, AlertTriangle, Info, AlertCircle, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -24,6 +25,7 @@ const typeColors = {
 
 export function NotificationDropdown() {
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useAuth();
+  const navigate = useNavigate();
 
   return (
     <DropdownMenu>
@@ -84,7 +86,10 @@ export function NotificationDropdown() {
         {notifications.length > 0 && (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-center text-sm text-primary cursor-pointer justify-center">
+            <DropdownMenuItem 
+              className="text-center text-sm text-primary cursor-pointer justify-center"
+              onClick={() => navigate('/dashboard/notifications')}
+            >
               View all notifications
             </DropdownMenuItem>
           </>

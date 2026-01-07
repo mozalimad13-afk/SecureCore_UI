@@ -20,6 +20,7 @@ import BlocklistPage from "./pages/dashboard/BlocklistPage";
 import WhitelistPage from "./pages/dashboard/WhitelistPage";
 import SettingsPage from "./pages/dashboard/SettingsPage";
 import DownloadsPage from "./pages/dashboard/DownloadsPage";
+import NotificationsPage from "./pages/dashboard/NotificationsPage";
 import { AdminLayout } from "./components/admin/AdminLayout";
 import AdminHome from "./pages/admin/AdminHome";
 import AdminUsers from "./pages/admin/AdminUsers";
@@ -53,6 +54,7 @@ const App = () => (
                   <Route path="reports" element={<ReportsPage />} />
                   <Route path="blocklist" element={<BlocklistPage />} />
                   <Route path="whitelist" element={<WhitelistPage />} />
+                  <Route path="notifications" element={<NotificationsPage />} />
                   <Route path="settings" element={<SettingsPage />} />
                   <Route path="downloads" element={<DownloadsPage />} />
                 </Route>
