@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +9,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import { Search, Filter, Download, AlertTriangle, Ban, ShieldCheck, MoreHorizontal } from 'lucide-react';
+import { Search, Filter, Download, AlertTriangle, Ban, ShieldCheck, MoreHorizontal, Clock } from 'lucide-react';
 import { 
   LineChart, 
   Line, 
@@ -26,22 +26,46 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import jsPDF from 'jspdf';
 
-const hourlyData = Array.from({ length: 24 }, (_, i) => ({
-  hour: `${i}:00`,
-  alerts: Math.floor(Math.random() * 50) + 10,
-}));
+const generateAlertsForPeriod = (days: number) => {
+  const baseAlerts = [
+    { ipSource: '192.168.1.105', sourcePort: '45678', ipDest: '10.0.0.1', destPort: '443', protocol: 'TCP', severity: 'High' },
+    { ipSource: '10.0.0.45', sourcePort: '52341', ipDest: '192.168.1.1', destPort: '22', protocol: 'TCP', severity: 'Critical' },
+    { ipSource: '172.16.0.88', sourcePort: '33456', ipDest: '10.0.0.5', destPort: '80', protocol: 'TCP', severity: 'Medium' },
+    { ipSource: '192.168.2.201', sourcePort: '48923', ipDest: '172.16.0.1', destPort: '3389', protocol: 'TCP', severity: 'High' },
+    { ipSource: '10.0.1.33', sourcePort: '51234', ipDest: '192.168.1.50', destPort: '8080', protocol: 'TCP', severity: 'Low' },
+    { ipSource: '192.168.1.78', sourcePort: '44567', ipDest: '10.0.0.100', destPort: '21', protocol: 'TCP', severity: 'Medium' },
+    { ipSource: '172.16.1.45', sourcePort: '39876', ipDest: '192.168.2.1', destPort: '53', protocol: 'UDP', severity: 'Low' },
+    { ipSource: '10.0.2.67', sourcePort: '47123', ipDest: '172.16.0.50', destPort: '445', protocol: 'TCP', severity: 'Critical' },
+  ];
 
-const alerts = [
-  { id: 1, ipSource: '192.168.1.105', sourcePort: '45678', ipDest: '10.0.0.1', destPort: '443', protocol: 'TCP', severity: 'High', timestamp: '2024-01-15 14:32:15' },
-  { id: 2, ipSource: '10.0.0.45', sourcePort: '52341', ipDest: '192.168.1.1', destPort: '22', protocol: 'TCP', severity: 'Critical', timestamp: '2024-01-15 14:28:42' },
-  { id: 3, ipSource: '172.16.0.88', sourcePort: '33456', ipDest: '10.0.0.5', destPort: '80', protocol: 'TCP', severity: 'Medium', timestamp: '2024-01-15 14:25:18' },
-  { id: 4, ipSource: '192.168.2.201', sourcePort: '48923', ipDest: '172.16.0.1', destPort: '3389', protocol: 'TCP', severity: 'High', timestamp: '2024-01-15 14:22:05' },
-  { id: 5, ipSource: '10.0.1.33', sourcePort: '51234', ipDest: '192.168.1.50', destPort: '8080', protocol: 'TCP', severity: 'Low', timestamp: '2024-01-15 14:18:33' },
-  { id: 6, ipSource: '192.168.1.78', sourcePort: '44567', ipDest: '10.0.0.100', destPort: '21', protocol: 'TCP', severity: 'Medium', timestamp: '2024-01-15 14:15:21' },
-  { id: 7, ipSource: '172.16.1.45', sourcePort: '39876', ipDest: '192.168.2.1', destPort: '53', protocol: 'UDP', severity: 'Low', timestamp: '2024-01-15 14:12:08' },
-  { id: 8, ipSource: '10.0.2.67', sourcePort: '47123', ipDest: '172.16.0.50', destPort: '445', protocol: 'TCP', severity: 'Critical', timestamp: '2024-01-15 14:08:45' },
-];
+  const now = new Date();
+  const alerts = [];
+  const alertCount = days === 1 ? 8 : days === 7 ? 35 : 120;
+
+  for (let i = 0; i < alertCount; i++) {
+    const baseAlert = baseAlerts[i % baseAlerts.length];
+    const randomHours = Math.floor(Math.random() * days * 24);
+    const timestamp = new Date(now.getTime() - randomHours * 60 * 60 * 1000);
+    alerts.push({
+      id: i + 1,
+      ...baseAlert,
+      sourcePort: String(Math.floor(Math.random() * 50000) + 10000),
+      timestamp: timestamp.toISOString(),
+    });
+  }
+
+  return alerts.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+};
+
+const generateHourlyData = (days: number) => {
+  const hours = days === 1 ? 24 : days === 7 ? 24 : 24;
+  return Array.from({ length: hours }, (_, i) => ({
+    hour: `${i}:00`,
+    alerts: Math.floor(Math.random() * 50 * (days === 30 ? 4 : days === 7 ? 2 : 1)) + 10,
+  }));
+};
 
 const severityColors: Record<string, string> = {
   Low: 'bg-success/10 text-success',
@@ -53,7 +77,12 @@ const severityColors: Record<string, string> = {
 export default function AlertsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [severityFilter, setSeverityFilter] = useState('all');
+  const [timeRange, setTimeRange] = useState('24h');
   const { toast } = useToast();
+
+  const days = timeRange === '24h' ? 1 : timeRange === '7d' ? 7 : 30;
+  const alerts = useMemo(() => generateAlertsForPeriod(days), [days]);
+  const hourlyData = useMemo(() => generateHourlyData(days), [days]);
 
   const filteredAlerts = alerts.filter(alert => {
     const matchesSearch = 
@@ -72,17 +101,75 @@ export default function AlertsPage() {
     toast({ title: 'Added to Whitelist', description: `${ip} has been added to your whitelist.` });
   };
 
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+    
+    // Title
+    doc.setFontSize(20);
+    doc.text('SecureCore - Security Alerts Report', 20, 20);
+    
+    // Time range info
+    doc.setFontSize(12);
+    const rangeLabel = timeRange === '24h' ? 'Last 24 Hours' : timeRange === '7d' ? 'Last 7 Days' : 'Last 30 Days';
+    doc.text(`Time Range: ${rangeLabel}`, 20, 35);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 42);
+    doc.text(`Total Alerts: ${filteredAlerts.length}`, 20, 49);
+    
+    // Table header
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    let y = 65;
+    doc.text('Source IP', 20, y);
+    doc.text('Dest IP', 55, y);
+    doc.text('Protocol', 90, y);
+    doc.text('Severity', 115, y);
+    doc.text('Timestamp', 145, y);
+    
+    // Table content
+    doc.setFont('helvetica', 'normal');
+    y += 8;
+    
+    filteredAlerts.slice(0, 40).forEach((alert) => {
+      if (y > 280) {
+        doc.addPage();
+        y = 20;
+      }
+      doc.text(alert.ipSource, 20, y);
+      doc.text(alert.ipDest, 55, y);
+      doc.text(alert.protocol, 90, y);
+      doc.text(alert.severity, 115, y);
+      doc.text(new Date(alert.timestamp).toLocaleString(), 145, y);
+      y += 6;
+    });
+    
+    doc.save(`securecore-alerts-${new Date().toISOString().split('T')[0]}.pdf`);
+    toast({ title: 'PDF exported', description: 'Alerts report has been downloaded.' });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold mb-2">Recent Alerts</h2>
-          <p className="text-muted-foreground">Monitor and analyze security alerts from the last 30 days.</p>
+          <p className="text-muted-foreground">Monitor and analyze security alerts.</p>
         </div>
-        <Button variant="outline">
-          <Download className="w-4 h-4 mr-2" />
-          Export
-        </Button>
+        <div className="flex gap-2">
+          <Select value={timeRange} onValueChange={setTimeRange}>
+            <SelectTrigger className="w-[140px]">
+              <Clock className="w-4 h-4 mr-2" />
+              <SelectValue placeholder="Time Range" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="24h">Last 24 Hours</SelectItem>
+              <SelectItem value="7d">Last 7 Days</SelectItem>
+              <SelectItem value="30d">Last 30 Days</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="outline" onClick={handleExportPDF}>
+            <Download className="w-4 h-4 mr-2" />
+            Export PDF
+          </Button>
+        </div>
       </div>
 
       {/* Hourly Activity Chart */}
@@ -90,7 +177,7 @@ export default function AlertsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <AlertTriangle className="w-5 h-5 text-warning" />
-            Alert Activity (Last 24 Hours)
+            Alert Activity ({timeRange === '24h' ? 'Last 24 Hours' : timeRange === '7d' ? 'Last 7 Days' : 'Last 30 Days'})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -179,7 +266,7 @@ export default function AlertsPage() {
                         {alert.severity}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-muted-foreground text-sm">{alert.timestamp}</td>
+                    <td className="py-3 px-4 text-muted-foreground text-sm">{new Date(alert.timestamp).toLocaleString()}</td>
                     <td className="py-3 px-4 text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>

@@ -11,6 +11,7 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { Search, Download, FileText, RefreshCw } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 const generateLogs = () => {
   const methods = ['GET', 'POST', 'PUT', 'DELETE'];
@@ -57,8 +58,6 @@ const generateLogs = () => {
   });
 };
 
-const logs = generateLogs();
-
 const getStatusColor = (status: number) => {
   if (status >= 500) return 'bg-destructive text-destructive-foreground';
   if (status >= 400) return 'bg-warning text-warning-foreground';
@@ -77,9 +76,11 @@ const getMethodColor = (method: string) => {
 };
 
 export default function AdminLogs() {
+  const [logs, setLogs] = useState(generateLogs);
   const [searchTerm, setSearchTerm] = useState('');
   const [methodFilter, setMethodFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const { toast } = useToast();
 
   const filteredLogs = logs.filter(log => {
     const matchesSearch = 
@@ -94,6 +95,33 @@ export default function AdminLogs() {
     return matchesSearch && matchesMethod && matchesStatus;
   });
 
+  const handleRefresh = () => {
+    setLogs(generateLogs());
+    toast({ title: 'Logs refreshed', description: 'Latest logs have been loaded.' });
+  };
+
+  const handleExport = () => {
+    const logContent = filteredLogs.map(log => {
+      const timestamp = new Date(log.timestamp).toISOString();
+      return `${timestamp} ${log.ip} "${log.method} ${log.path}" ${log.status} ${log.size} ${log.responseTime}ms "${log.userAgent}"`;
+    }).join('\n');
+
+    const header = '# SecureCore HTTP Logs\n# Format: timestamp ip "method path" status size response_time user_agent\n\n';
+    const content = header + logContent;
+
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `securecore-logs-${new Date().toISOString().split('T')[0]}.log`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toast({ title: 'Logs exported', description: 'Log file has been downloaded.' });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -102,11 +130,11 @@ export default function AdminLogs() {
           <p className="text-muted-foreground">View Nginx-style HTTP request logs from the server.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleRefresh}>
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
           </Button>
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExport}>
             <Download className="w-4 h-4 mr-2" />
             Export
           </Button>

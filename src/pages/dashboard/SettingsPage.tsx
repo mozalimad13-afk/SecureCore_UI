@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -56,26 +56,72 @@ export default function SettingsPage() {
     removePaymentMethod, 
     setDefaultPaymentMethod,
     runBackupNow,
-    cancelSubscription 
+    cancelSubscription,
+    resubscribe
   } = useSettings();
   const { toast } = useToast();
   
+  // Local state for pending changes (before saving)
+  const [pendingTheme, setPendingTheme] = useState(theme);
+  const [pendingNotifications, setPendingNotifications] = useState({
+    emailNotifications: settings.emailNotifications,
+    smsNotifications: settings.smsNotifications,
+    webhookNotifications: settings.webhookNotifications,
+    webhookUrl: settings.webhookUrl,
+  });
+  const [pendingReminders, setPendingReminders] = useState({
+    dailyDigest: settings.dailyDigest,
+    weeklyReport: settings.weeklyReport,
+    digestTime: settings.digestTime,
+  });
+  const [pendingBackup, setPendingBackup] = useState({
+    backupFrequency: settings.backupFrequency,
+  });
+  
   const [newCard, setNewCard] = useState({ last4: '', expiry: '' });
   const [isAddCardOpen, setIsAddCardOpen] = useState(false);
+  const [isSubscribeOpen, setIsSubscribeOpen] = useState(false);
+  const [subscribeCard, setSubscribeCard] = useState({ cardNumber: '', expiry: '', cvc: '' });
+
+  // Sync pending state when settings change
+  useEffect(() => {
+    setPendingTheme(theme);
+  }, [theme]);
+
+  useEffect(() => {
+    setPendingNotifications({
+      emailNotifications: settings.emailNotifications,
+      smsNotifications: settings.smsNotifications,
+      webhookNotifications: settings.webhookNotifications,
+      webhookUrl: settings.webhookUrl,
+    });
+    setPendingReminders({
+      dailyDigest: settings.dailyDigest,
+      weeklyReport: settings.weeklyReport,
+      digestTime: settings.digestTime,
+    });
+    setPendingBackup({
+      backupFrequency: settings.backupFrequency,
+    });
+  }, [settings]);
 
   const handleSavePreferences = () => {
+    setTheme(pendingTheme);
     toast({ title: 'Settings saved', description: 'Your theme preferences have been updated.' });
   };
 
   const handleSaveNotifications = () => {
+    updateSettings(pendingNotifications);
     toast({ title: 'Notifications saved', description: 'Your notification preferences have been updated.' });
   };
 
   const handleSaveReminders = () => {
+    updateSettings(pendingReminders);
     toast({ title: 'Reminders saved', description: 'Your reminder preferences have been updated.' });
   };
 
   const handleSaveBackup = () => {
+    updateSettings(pendingBackup);
     toast({ title: 'Backup settings saved', description: 'Your backup preferences have been updated.' });
   };
 
@@ -98,9 +144,22 @@ export default function SettingsPage() {
     toast({ title: 'Subscription cancelled', description: 'Your subscription has been cancelled.' });
   };
 
+  const handleSubscribe = () => {
+    if (subscribeCard.cardNumber && subscribeCard.expiry && subscribeCard.cvc) {
+      resubscribe();
+      setIsSubscribeOpen(false);
+      setSubscribeCard({ cardNumber: '', expiry: '', cvc: '' });
+      toast({ title: 'Subscription activated', description: 'Welcome back! Your subscription is now active.' });
+    } else {
+      toast({ title: 'Error', description: 'Please fill in all payment details.', variant: 'destructive' });
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString();
   };
+
+  const isSubscriptionCancelled = settings.plan === 'Cancelled';
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -138,9 +197,9 @@ export default function SettingsPage() {
                   ].map((option) => (
                     <button
                       key={option.value}
-                      onClick={() => setTheme(option.value as 'light' | 'dark' | 'system')}
+                      onClick={() => setPendingTheme(option.value as 'light' | 'dark' | 'system')}
                       className={`p-4 rounded-lg border-2 transition-colors ${
-                        theme === option.value 
+                        pendingTheme === option.value 
                           ? 'border-primary bg-primary/5' 
                           : 'border-border hover:border-primary/50'
                       }`}
@@ -172,8 +231,8 @@ export default function SettingsPage() {
                   <p className="text-sm text-muted-foreground">Receive alerts via email</p>
                 </div>
                 <Switch 
-                  checked={settings.emailNotifications} 
-                  onCheckedChange={(checked) => updateSettings({ emailNotifications: checked })} 
+                  checked={pendingNotifications.emailNotifications} 
+                  onCheckedChange={(checked) => setPendingNotifications(prev => ({ ...prev, emailNotifications: checked }))} 
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -182,8 +241,8 @@ export default function SettingsPage() {
                   <p className="text-sm text-muted-foreground">Receive critical alerts via SMS</p>
                 </div>
                 <Switch 
-                  checked={settings.smsNotifications} 
-                  onCheckedChange={(checked) => updateSettings({ smsNotifications: checked })} 
+                  checked={pendingNotifications.smsNotifications} 
+                  onCheckedChange={(checked) => setPendingNotifications(prev => ({ ...prev, smsNotifications: checked }))} 
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -192,17 +251,17 @@ export default function SettingsPage() {
                   <p className="text-sm text-muted-foreground">Send alerts to your webhook endpoint</p>
                 </div>
                 <Switch 
-                  checked={settings.webhookNotifications} 
-                  onCheckedChange={(checked) => updateSettings({ webhookNotifications: checked })} 
+                  checked={pendingNotifications.webhookNotifications} 
+                  onCheckedChange={(checked) => setPendingNotifications(prev => ({ ...prev, webhookNotifications: checked }))} 
                 />
               </div>
-              {settings.webhookNotifications && (
+              {pendingNotifications.webhookNotifications && (
                 <div className="space-y-2">
                   <Label htmlFor="webhookUrl">Webhook URL</Label>
                   <Input
                     id="webhookUrl"
-                    value={settings.webhookUrl}
-                    onChange={(e) => updateSettings({ webhookUrl: e.target.value })}
+                    value={pendingNotifications.webhookUrl}
+                    onChange={(e) => setPendingNotifications(prev => ({ ...prev, webhookUrl: e.target.value }))}
                     placeholder="https://your-webhook-endpoint.com/alerts"
                   />
                 </div>
@@ -228,8 +287,8 @@ export default function SettingsPage() {
                   <p className="text-sm text-muted-foreground">Receive a daily summary of alerts</p>
                 </div>
                 <Switch 
-                  checked={settings.dailyDigest} 
-                  onCheckedChange={(checked) => updateSettings({ dailyDigest: checked })} 
+                  checked={pendingReminders.dailyDigest} 
+                  onCheckedChange={(checked) => setPendingReminders(prev => ({ ...prev, dailyDigest: checked }))} 
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -238,15 +297,15 @@ export default function SettingsPage() {
                   <p className="text-sm text-muted-foreground">Get a comprehensive weekly report</p>
                 </div>
                 <Switch 
-                  checked={settings.weeklyReport} 
-                  onCheckedChange={(checked) => updateSettings({ weeklyReport: checked })} 
+                  checked={pendingReminders.weeklyReport} 
+                  onCheckedChange={(checked) => setPendingReminders(prev => ({ ...prev, weeklyReport: checked }))} 
                 />
               </div>
               <div className="space-y-2">
                 <Label>Digest Time</Label>
                 <Select 
-                  value={settings.digestTime} 
-                  onValueChange={(value) => updateSettings({ digestTime: value })}
+                  value={pendingReminders.digestTime} 
+                  onValueChange={(value) => setPendingReminders(prev => ({ ...prev, digestTime: value }))}
                 >
                   <SelectTrigger className="w-[200px]">
                     <SelectValue placeholder="Select time" />
@@ -277,8 +336,8 @@ export default function SettingsPage() {
               <div className="space-y-2">
                 <Label>Backup Frequency</Label>
                 <Select 
-                  value={settings.backupFrequency} 
-                  onValueChange={(value: 'hourly' | 'daily' | 'weekly' | 'monthly') => updateSettings({ backupFrequency: value })}
+                  value={pendingBackup.backupFrequency} 
+                  onValueChange={(value: 'hourly' | 'daily' | 'weekly' | 'monthly') => setPendingBackup({ backupFrequency: value })}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select frequency" />
@@ -322,16 +381,18 @@ export default function SettingsPage() {
               <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <p className="font-semibold text-lg">{settings.plan} Plan</p>
-                    <p className="text-sm text-muted-foreground">{settings.planPrice}</p>
+                    <p className="font-semibold text-lg">{isSubscriptionCancelled ? 'No Active Plan' : `${settings.plan} Plan`}</p>
+                    <p className="text-sm text-muted-foreground">{isSubscriptionCancelled ? 'Subscribe to continue using SecureCore' : settings.planPrice}</p>
                   </div>
-                  <span className={`px-3 py-1 text-sm rounded-full ${settings.plan === 'Cancelled' ? 'bg-destructive/10 text-destructive' : 'bg-success/10 text-success'}`}>
-                    {settings.plan === 'Cancelled' ? 'Cancelled' : 'Active'}
+                  <span className={`px-3 py-1 text-sm rounded-full ${isSubscriptionCancelled ? 'bg-destructive/10 text-destructive' : 'bg-success/10 text-success'}`}>
+                    {isSubscriptionCancelled ? 'Cancelled' : 'Active'}
                   </span>
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  <p>Next billing date: {settings.nextBillingDate}</p>
-                </div>
+                {!isSubscriptionCancelled && (
+                  <div className="text-sm text-muted-foreground">
+                    <p>Next billing date: {settings.nextBillingDate}</p>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-4">
@@ -422,28 +483,83 @@ export default function SettingsPage() {
               </div>
 
               <div className="pt-4 border-t border-border">
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="destructive" disabled={settings.plan === 'Cancelled'}>
-                      Cancel Subscription
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Cancel Subscription?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This action will cancel your subscription at the end of your current billing period. 
-                        You will lose access to premium features.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Keep Subscription</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleCancelSubscription}>
-                        Yes, Cancel
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                {isSubscriptionCancelled ? (
+                  <Dialog open={isSubscribeOpen} onOpenChange={setIsSubscribeOpen}>
+                    <DialogTrigger asChild>
+                      <Button>Subscribe</Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Subscribe to SecureCore</DialogTitle>
+                        <DialogDescription>
+                          Enter your payment details to reactivate your subscription.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="p-4 rounded-lg bg-primary/5 border border-primary/20 mb-4">
+                          <p className="font-semibold">Professional Plan</p>
+                          <p className="text-2xl font-bold">$99/month</p>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="cardNumber">Card Number</Label>
+                          <Input
+                            id="cardNumber"
+                            placeholder="1234 5678 9012 3456"
+                            value={subscribeCard.cardNumber}
+                            onChange={(e) => setSubscribeCard({ ...subscribeCard, cardNumber: e.target.value })}
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="subExpiry">Expiry Date</Label>
+                            <Input
+                              id="subExpiry"
+                              placeholder="MM/YY"
+                              value={subscribeCard.expiry}
+                              onChange={(e) => setSubscribeCard({ ...subscribeCard, expiry: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="cvc">CVC</Label>
+                            <Input
+                              id="cvc"
+                              placeholder="123"
+                              value={subscribeCard.cvc}
+                              onChange={(e) => setSubscribeCard({ ...subscribeCard, cvc: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsSubscribeOpen(false)}>Cancel</Button>
+                        <Button onClick={handleSubscribe}>Subscribe Now</Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                ) : (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive">
+                        Cancel Subscription
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Cancel Subscription?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This action will cancel your subscription at the end of your current billing period. 
+                          You will lose access to premium features.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Keep Subscription</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleCancelSubscription}>
+                          Yes, Cancel
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
               </div>
             </CardContent>
           </Card>

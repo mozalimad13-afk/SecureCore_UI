@@ -39,6 +39,7 @@ interface SettingsContextType {
   setDefaultPaymentMethod: (id: string) => void;
   runBackupNow: () => void;
   cancelSubscription: () => void;
+  resubscribe: () => void;
 }
 
 const defaultSettings: Settings = {
@@ -120,6 +121,15 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }));
   };
 
+  const resubscribe = () => {
+    setSettings(prev => ({
+      ...prev,
+      plan: 'Professional',
+      planPrice: '$99/month',
+      nextBillingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    }));
+  };
+
   return (
     <SettingsContext.Provider value={{
       settings,
@@ -129,6 +139,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       setDefaultPaymentMethod,
       runBackupNow,
       cancelSubscription,
+      resubscribe,
     }}>
       {children}
     </SettingsContext.Provider>
