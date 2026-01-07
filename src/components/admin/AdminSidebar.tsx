@@ -19,7 +19,6 @@ const menuItems = [
   { icon: Activity, label: 'System Health', href: '/admin/system' },
   { icon: Bell, label: 'Notifications', href: '/admin/notifications' },
   { icon: FileText, label: 'Logs', href: '/admin/logs' },
-  { icon: Settings, label: 'Settings', href: '/admin/settings' },
 ];
 
 export function AdminSidebar() {

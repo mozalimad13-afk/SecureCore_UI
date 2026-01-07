@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Download, Monitor, Terminal, Apple, CheckCircle } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 const platforms = [
   {
@@ -9,7 +10,7 @@ const platforms = [
     version: '2.4.1',
     size: '45 MB',
     requirements: 'Windows 10 or later',
-    downloadUrl: '#',
+    downloadUrl: 'securecore-agent-windows-2.4.1.exe',
     features: ['System tray integration', 'Auto-start on boot', 'Background monitoring'],
   },
   {
@@ -18,7 +19,7 @@ const platforms = [
     version: '2.4.1',
     size: '38 MB',
     requirements: 'Ubuntu 20.04+ / CentOS 8+ / Debian 10+',
-    downloadUrl: '#',
+    downloadUrl: 'securecore-agent-linux-2.4.1.tar.gz',
     features: ['Systemd service', 'CLI interface', 'Docker support'],
   },
   {
@@ -27,12 +28,49 @@ const platforms = [
     version: '2.4.1',
     size: '42 MB',
     requirements: 'macOS 11 Big Sur or later',
-    downloadUrl: '#',
+    downloadUrl: 'securecore-agent-macos-2.4.1.dmg',
     features: ['Menu bar app', 'Native notifications', 'Apple Silicon support'],
   },
 ];
 
 export default function DownloadsPage() {
+  const { toast } = useToast();
+
+  const handleDownload = (platform: typeof platforms[0]) => {
+    // Create a simulated download file
+    const content = `# SecureCore Agent for ${platform.name}
+# Version: ${platform.version}
+# 
+# This is a simulated download file.
+# In production, this would be the actual installer.
+#
+# Installation Instructions:
+# 1. Run this installer
+# 2. Follow the setup wizard
+# 3. Enter your API token when prompted
+# 4. Start monitoring!
+#
+# Requirements: ${platform.requirements}
+#
+# For support, visit: https://support.securecore.com
+`;
+
+    const blob = new Blob([content], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = platform.downloadUrl;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toast({ 
+      title: 'Download started', 
+      description: `SecureCore Agent for ${platform.name} v${platform.version} is downloading.` 
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -65,7 +103,7 @@ export default function DownloadsPage() {
                   <span>Version {platform.version}</span>
                   <span>{platform.size}</span>
                 </div>
-                <Button className="w-full">
+                <Button className="w-full" onClick={() => handleDownload(platform)}>
                   <Download className="w-4 h-4 mr-2" />
                   Download for {platform.name}
                 </Button>
