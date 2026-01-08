@@ -74,10 +74,13 @@ const severityColors: Record<string, string> = {
   Critical: 'bg-purple-500/10 text-purple-500',
 };
 
+const ITEMS_PER_PAGE = 15;
+
 export default function AlertsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [severityFilter, setSeverityFilter] = useState('all');
   const [timeRange, setTimeRange] = useState('24h');
+  const [currentPage, setCurrentPage] = useState(1);
   const { toast } = useToast();
 
   const days = timeRange === '24h' ? 1 : timeRange === '7d' ? 7 : 30;
@@ -92,6 +95,28 @@ export default function AlertsPage() {
     const matchesSeverity = severityFilter === 'all' || alert.severity === severityFilter;
     return matchesSearch && matchesSeverity;
   });
+
+  const totalPages = Math.ceil(filteredAlerts.length / ITEMS_PER_PAGE);
+  const paginatedAlerts = filteredAlerts.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  // Reset to page 1 when filters change
+  const handleFilterChange = (newFilter: string) => {
+    setSeverityFilter(newFilter);
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    setCurrentPage(1);
+  };
+
+  const handleTimeRangeChange = (value: string) => {
+    setTimeRange(value);
+    setCurrentPage(1);
+  };
 
   const handleAddToBlocklist = (ip: string) => {
     toast({ title: 'Added to Blocklist', description: `${ip} has been added to your blocklist.` });
@@ -154,7 +179,7 @@ export default function AlertsPage() {
           <p className="text-muted-foreground">Monitor and analyze security alerts.</p>
         </div>
         <div className="flex gap-2">
-          <Select value={timeRange} onValueChange={setTimeRange}>
+          <Select value={timeRange} onValueChange={handleTimeRangeChange}>
             <SelectTrigger className="w-[140px]">
               <Clock className="w-4 h-4 mr-2" />
               <SelectValue placeholder="Time Range" />
@@ -216,10 +241,10 @@ export default function AlertsPage() {
                 placeholder="Search by IP, protocol..." 
                 className="pl-10"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
               />
             </div>
-            <Select value={severityFilter} onValueChange={setSeverityFilter}>
+            <Select value={severityFilter} onValueChange={handleFilterChange}>
               <SelectTrigger className="w-full md:w-[180px]">
                 <Filter className="w-4 h-4 mr-2" />
                 <SelectValue placeholder="Severity" />
@@ -254,7 +279,7 @@ export default function AlertsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredAlerts.map((alert) => (
+                {paginatedAlerts.map((alert) => (
                   <tr key={alert.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
                     <td className="py-3 px-4 font-mono text-sm">{alert.ipSource}</td>
                     <td className="py-3 px-4 font-mono text-sm">{alert.sourcePort}</td>
@@ -292,6 +317,54 @@ export default function AlertsPage() {
               </tbody>
             </table>
           </div>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between p-4 border-t border-border">
+              <p className="text-sm text-muted-foreground">
+                Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, filteredAlerts.length)} of {filteredAlerts.length} alerts
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter(page => {
+                      // Show first, last, current, and adjacent pages
+                      return page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1;
+                    })
+                    .map((page, index, arr) => (
+                      <span key={page} className="flex items-center">
+                        {index > 0 && arr[index - 1] !== page - 1 && (
+                          <span className="px-2 text-muted-foreground">...</span>
+                        )}
+                        <Button
+                          variant={currentPage === page ? 'default' : 'outline'}
+                          size="sm"
+                          className="min-w-[36px]"
+                          onClick={() => setCurrentPage(page)}
+                        >
+                          {page}
+                        </Button>
+                      </span>
+                    ))}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
