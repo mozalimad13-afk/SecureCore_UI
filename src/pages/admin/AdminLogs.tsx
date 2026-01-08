@@ -10,8 +10,18 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
 import { Search, Download, FileText, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+
+const LOGS_PER_PAGE = 15;
 
 const generateLogs = () => {
   const methods = ['GET', 'POST', 'PUT', 'DELETE'];
@@ -80,6 +90,7 @@ export default function AdminLogs() {
   const [searchTerm, setSearchTerm] = useState('');
   const [methodFilter, setMethodFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
   const { toast } = useToast();
 
   const filteredLogs = logs.filter(log => {
@@ -95,8 +106,21 @@ export default function AdminLogs() {
     return matchesSearch && matchesMethod && matchesStatus;
   });
 
+  const totalPages = Math.ceil(filteredLogs.length / LOGS_PER_PAGE);
+  const paginatedLogs = filteredLogs.slice(
+    (currentPage - 1) * LOGS_PER_PAGE,
+    currentPage * LOGS_PER_PAGE
+  );
+
+  // Reset to page 1 when filters change
+  const handleFilterChange = (setter: (value: string) => void, value: string) => {
+    setter(value);
+    setCurrentPage(1);
+  };
+
   const handleRefresh = () => {
     setLogs(generateLogs());
+    setCurrentPage(1);
     toast({ title: 'Logs refreshed', description: 'Latest logs have been loaded.' });
   };
 
@@ -120,6 +144,32 @@ export default function AdminLogs() {
     URL.revokeObjectURL(url);
 
     toast({ title: 'Logs exported', description: 'Log file has been downloaded.' });
+  };
+
+  const renderPaginationItems = () => {
+    const items = [];
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+    if (endPage - startPage + 1 < maxVisiblePages) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      items.push(
+        <PaginationItem key={i}>
+          <PaginationLink
+            onClick={() => setCurrentPage(i)}
+            isActive={currentPage === i}
+            className="cursor-pointer"
+          >
+            {i}
+          </PaginationLink>
+        </PaginationItem>
+      );
+    }
+    return items;
   };
 
   return (
@@ -151,10 +201,10 @@ export default function AdminLogs() {
                 placeholder="Search by path or IP..." 
                 className="pl-10"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => handleFilterChange(setSearchTerm, e.target.value)}
               />
             </div>
-            <Select value={methodFilter} onValueChange={setMethodFilter}>
+            <Select value={methodFilter} onValueChange={(v) => handleFilterChange(setMethodFilter, v)}>
               <SelectTrigger className="w-full md:w-[150px]">
                 <SelectValue placeholder="Method" />
               </SelectTrigger>
@@ -166,7 +216,7 @@ export default function AdminLogs() {
                 <SelectItem value="DELETE">DELETE</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select value={statusFilter} onValueChange={(v) => handleFilterChange(setStatusFilter, v)}>
               <SelectTrigger className="w-full md:w-[150px]">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
@@ -205,7 +255,7 @@ export default function AdminLogs() {
                 </tr>
               </thead>
               <tbody className="font-mono text-xs">
-                {filteredLogs.slice(0, 30).map((log) => (
+                {paginatedLogs.map((log) => (
                   <tr key={log.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
                     <td className="py-2 px-4 text-muted-foreground">
                       {new Date(log.timestamp).toLocaleString()}
@@ -229,6 +279,29 @@ export default function AdminLogs() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="p-4 border-t border-border">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                  {renderPaginationItems()}
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
