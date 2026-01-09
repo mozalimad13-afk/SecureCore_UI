@@ -26,7 +26,11 @@ const menuItems = [
   { icon: Download, label: 'Downloads', href: '/dashboard/downloads' },
 ];
 
-export function DashboardSidebar() {
+interface DashboardSidebarProps {
+  onNavigate?: () => void;
+}
+
+export function DashboardSidebar({ onNavigate }: DashboardSidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -34,12 +38,17 @@ export function DashboardSidebar() {
     localStorage.removeItem('isAuthenticated');
     localStorage.removeItem('userRole');
     navigate('/');
+    onNavigate?.();
+  };
+
+  const handleLinkClick = () => {
+    onNavigate?.();
   };
 
   return (
     <aside className="w-64 min-h-screen bg-sidebar border-r border-sidebar-border flex flex-col">
       <div className="p-4 border-b border-sidebar-border">
-        <Link to="/" className="flex items-center gap-2">
+        <Link to="/" className="flex items-center gap-2" onClick={handleLinkClick}>
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
             <Shield className="w-5 h-5 text-primary-foreground" />
           </div>
@@ -47,7 +56,7 @@ export function DashboardSidebar() {
         </Link>
       </div>
 
-      <nav className="flex-1 p-4 space-y-1">
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {menuItems.map((item) => {
           const isActive = location.pathname === item.href || 
             (item.href !== '/dashboard' && location.pathname.startsWith(item.href));
@@ -56,6 +65,7 @@ export function DashboardSidebar() {
             <Link
               key={item.href}
               to={item.href}
+              onClick={handleLinkClick}
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors',
                 isActive 
@@ -63,8 +73,8 @@ export function DashboardSidebar() {
                   : 'text-sidebar-foreground hover:bg-sidebar-accent'
               )}
             >
-              <item.icon className="w-5 h-5" />
-              {item.label}
+              <item.icon className="w-5 h-5 flex-shrink-0" />
+              <span className="truncate">{item.label}</span>
             </Link>
           );
         })}
@@ -76,7 +86,7 @@ export function DashboardSidebar() {
           className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent"
           onClick={handleLogout}
         >
-          <LogOut className="w-5 h-5 mr-3" />
+          <LogOut className="w-5 h-5 mr-3 flex-shrink-0" />
           Log out
         </Button>
       </div>

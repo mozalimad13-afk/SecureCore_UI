@@ -12,8 +12,18 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
 import { CheckCircle, Plus, Pencil, Trash2, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+
+const ITEMS_PER_PAGE = 15;
 
 interface WhitelistedIP {
   id: number;
@@ -28,6 +38,18 @@ const initialWhitelist: WhitelistedIP[] = [
   { id: 3, ip: '172.16.0.50', description: 'Backup server', timestamp: '2024-01-12 09:08:33' },
   { id: 4, ip: '10.0.1.100', description: 'Development server', timestamp: '2024-01-10 16:42:18' },
   { id: 5, ip: '192.168.2.1', description: 'Branch office router', timestamp: '2024-01-08 11:25:55' },
+  { id: 6, ip: '10.0.2.50', description: 'Monitoring server', timestamp: '2024-01-07 09:15:30' },
+  { id: 7, ip: '172.16.1.100', description: 'Database server', timestamp: '2024-01-06 14:22:18' },
+  { id: 8, ip: '192.168.3.0/24', description: 'Guest network', timestamp: '2024-01-05 11:45:42' },
+  { id: 9, ip: '10.0.3.75', description: 'Load balancer', timestamp: '2024-01-04 16:33:55' },
+  { id: 10, ip: '172.16.2.25', description: 'API gateway', timestamp: '2024-01-03 10:18:22' },
+  { id: 11, ip: '192.168.4.10', description: 'CI/CD server', timestamp: '2024-01-02 08:55:15' },
+  { id: 12, ip: '10.0.4.200', description: 'Staging server', timestamp: '2024-01-01 15:42:30' },
+  { id: 13, ip: '172.16.3.150', description: 'VPN gateway', timestamp: '2023-12-31 12:28:45' },
+  { id: 14, ip: '192.168.5.0/24', description: 'Server room subnet', timestamp: '2023-12-30 09:15:18' },
+  { id: 15, ip: '10.0.5.100', description: 'DNS server', timestamp: '2023-12-29 16:45:55' },
+  { id: 16, ip: '172.16.4.75', description: 'Mail server', timestamp: '2023-12-28 11:22:33' },
+  { id: 17, ip: '192.168.6.50', description: 'Log aggregator', timestamp: '2023-12-27 14:55:42' },
 ];
 
 export default function WhitelistPage() {
@@ -38,10 +60,17 @@ export default function WhitelistPage() {
   const [editingItem, setEditingItem] = useState<WhitelistedIP | null>(null);
   const [newIP, setNewIP] = useState('');
   const [newDescription, setNewDescription] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
   const { toast } = useToast();
 
   const filteredList = whitelist.filter(item => 
     item.ip.includes(searchTerm) || item.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const totalPages = Math.ceil(filteredList.length / ITEMS_PER_PAGE);
+  const paginatedList = filteredList.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
   );
 
   const handleAdd = () => {
@@ -78,6 +107,32 @@ export default function WhitelistPage() {
   const handleDelete = (id: number) => {
     setWhitelist(whitelist.filter(item => item.id !== id));
     toast({ title: 'Removed', description: 'IP has been removed from the whitelist.' });
+  };
+
+  const renderPaginationItems = () => {
+    const items = [];
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+    if (endPage - startPage + 1 < maxVisiblePages) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      items.push(
+        <PaginationItem key={i}>
+          <PaginationLink
+            onClick={() => setCurrentPage(i)}
+            isActive={currentPage === i}
+            className="cursor-pointer"
+          >
+            {i}
+          </PaginationLink>
+        </PaginationItem>
+      );
+    }
+    return items;
   };
 
   return (
@@ -121,7 +176,7 @@ export default function WhitelistPage() {
                 />
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="flex-col sm:flex-row gap-2">
               <Button variant="outline" onClick={() => setIsAddOpen(false)}>Cancel</Button>
               <Button onClick={handleAdd}>Add to Whitelist</Button>
             </DialogFooter>
@@ -138,7 +193,10 @@ export default function WhitelistPage() {
                 placeholder="Search IP or description..." 
                 className="pl-10"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
               />
             </div>
           </div>
@@ -149,22 +207,22 @@ export default function WhitelistPage() {
               <thead>
                 <tr className="border-b border-border bg-muted/50">
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">IP Address</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Description</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Added At</th>
+                  <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Description</th>
+                  <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden lg:table-cell">Added At</th>
                   <th className="text-right py-3 px-4 font-medium text-muted-foreground">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredList.map((item) => (
+                {paginatedList.map((item) => (
                   <tr key={item.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 text-success" />
-                        <span className="font-mono">{item.ip}</span>
+                        <CheckCircle className="w-4 h-4 text-success flex-shrink-0" />
+                        <span className="font-mono text-sm">{item.ip}</span>
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-muted-foreground">{item.description}</td>
-                    <td className="py-3 px-4 text-muted-foreground text-sm">{item.timestamp}</td>
+                    <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{item.description}</td>
+                    <td className="py-3 px-4 text-muted-foreground text-sm hidden lg:table-cell">{item.timestamp}</td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex justify-end gap-2">
                         <Button 
@@ -192,6 +250,29 @@ export default function WhitelistPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="p-4 border-t border-border">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                  {renderPaginationItems()}
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -221,7 +302,7 @@ export default function WhitelistPage() {
               </div>
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button variant="outline" onClick={() => setIsEditOpen(false)}>Cancel</Button>
             <Button onClick={handleEdit}>Save Changes</Button>
           </DialogFooter>
