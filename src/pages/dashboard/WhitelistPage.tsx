@@ -113,7 +113,7 @@ export default function WhitelistPage() {
     const items = [];
     const maxVisiblePages = 5;
     let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    const endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
 
     if (endPage - startPage + 1 < maxVisiblePages) {
       startPage = Math.max(1, endPage - maxVisiblePages + 1);
@@ -281,6 +281,9 @@ export default function WhitelistPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit Whitelist Entry</DialogTitle>
+            <DialogDescription>
+              Update the IP address or description.
+            </DialogDescription>
           </DialogHeader>
           {editingItem && (
             <div className="space-y-4 py-4">

@@ -7,7 +7,8 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { NotificationDropdown } from '@/components/NotificationDropdown';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotificationPopup } from '@/contexts/NotificationPopupContext';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -63,7 +64,10 @@ export function DashboardLayout() {
 
       {/* Mobile Sidebar */}
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-        <SheetContent side="left" className="p-0 w-64">
+        <SheetContent side="left" className="p-0 w-64" aria-describedby={undefined}>
+          <VisuallyHidden>
+            <SheetTitle>Navigation Menu</SheetTitle>
+          </VisuallyHidden>
           <DashboardSidebar onNavigate={() => setSidebarOpen(false)} />
         </SheetContent>
       </Sheet>
