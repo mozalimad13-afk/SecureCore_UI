@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, CreditCard, AlertTriangle, Activity, TrendingUp, TrendingDown } from 'lucide-react';
 import { 
@@ -11,6 +12,7 @@ import {
   AreaChart,
   Area
 } from 'recharts';
+import { useNotificationPopup } from '@/contexts/NotificationPopupContext';
 
 const statsData = [
   { title: 'Total Users', value: '2,847', change: '+12%', icon: Users, positive: true },
@@ -54,6 +56,40 @@ const statusColors: Record<string, string> = {
 };
 
 export default function AdminHome() {
+  const { showNotification } = useNotificationPopup();
+
+  // Demo: Show popup notifications for admin events
+  useEffect(() => {
+    const hasShownDemo = sessionStorage.getItem('adminPopupDemo');
+    if (!hasShownDemo) {
+      // Simulate new user registration notification after 2 seconds
+      const timer1 = setTimeout(() => {
+        showNotification({
+          title: 'New User Registration',
+          message: 'John Smith registered for Enterprise plan',
+          type: 'info',
+          link: '/admin/users',
+        });
+      }, 2000);
+
+      // Simulate system health warning after 5 seconds
+      const timer2 = setTimeout(() => {
+        showNotification({
+          title: 'System Health Warning',
+          message: 'CPU usage exceeded 85% threshold',
+          type: 'warning',
+          link: '/admin/system',
+        });
+      }, 5000);
+
+      sessionStorage.setItem('adminPopupDemo', 'true');
+
+      return () => {
+        clearTimeout(timer1);
+        clearTimeout(timer2);
+      };
+    }
+  }, [showNotification]);
   return (
     <div className="space-y-6">
       <div>

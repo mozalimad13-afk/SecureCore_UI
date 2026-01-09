@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell 
 } from 'recharts';
 import { useToast } from '@/hooks/use-toast';
+import { useNotificationPopup } from '@/contexts/NotificationPopupContext';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,6 +57,40 @@ const severityColors: Record<string, string> = {
 export default function DashboardHome() {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { showNotification } = useNotificationPopup();
+
+  // Demo: Show popup notifications for client events
+  useEffect(() => {
+    const hasShownDemo = sessionStorage.getItem('clientPopupDemo');
+    if (!hasShownDemo) {
+      // Simulate critical alert after 3 seconds
+      const timer1 = setTimeout(() => {
+        showNotification({
+          title: 'Critical Security Alert',
+          message: 'Brute force attack detected from IP 10.0.0.45',
+          type: 'alert',
+          link: '/dashboard/alerts',
+        });
+      }, 3000);
+
+      // Simulate threat blocked after 6 seconds
+      const timer2 = setTimeout(() => {
+        showNotification({
+          title: 'Threat Blocked',
+          message: '43 malicious requests blocked in the last hour',
+          type: 'info',
+          link: '/dashboard/reports',
+        });
+      }, 6000);
+
+      sessionStorage.setItem('clientPopupDemo', 'true');
+
+      return () => {
+        clearTimeout(timer1);
+        clearTimeout(timer2);
+      };
+    }
+  }, [showNotification]);
 
   const handleAddToBlocklist = (ip: string) => {
     toast({ title: 'Added to Blocklist', description: `${ip} has been added to your blocklist.` });
