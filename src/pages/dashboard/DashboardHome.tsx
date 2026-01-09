@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Shield, AlertTriangle, CheckCircle, Activity, Ban, ShieldCheck } from 'lucide-react';
-import { 
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell 
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
 import { useToast } from '@/hooks/use-toast';
 import { useNotificationPopup } from '@/contexts/NotificationPopupContext';
@@ -14,215 +14,264 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-
-const statsData = [
-  { title: 'Total Alerts Today', value: '127', icon: AlertTriangle, color: 'text-warning' },
-  { title: 'Blocked Threats', value: '43', icon: Shield, color: 'text-destructive' },
-  { title: 'Whitelisted IPs', value: '256', icon: CheckCircle, color: 'text-success' },
-  { title: 'Network Health', value: '98.5%', icon: Activity, color: 'text-primary' },
-];
-
-const lineChartData = [
-  { name: 'Mon', alerts: 45, blocked: 12 },
-  { name: 'Tue', alerts: 52, blocked: 18 },
-  { name: 'Wed', alerts: 38, blocked: 8 },
-  { name: 'Thu', alerts: 65, blocked: 24 },
-  { name: 'Fri', alerts: 48, blocked: 15 },
-  { name: 'Sat', alerts: 31, blocked: 7 },
-  { name: 'Sun', alerts: 27, blocked: 5 },
-];
-
-const pieData = [
-  { name: 'Low', value: 45, color: '#22c55e' },
-  { name: 'Medium', value: 32, color: '#f59e0b' },
-  { name: 'High', value: 18, color: '#ef4444' },
-  { name: 'Critical', value: 5, color: '#7c3aed' },
-];
-
-const recentAlerts = [
-  { id: 1, ip: '192.168.1.105', type: 'Port Scan', severity: 'High', time: '2 min ago' },
-  { id: 2, ip: '10.0.0.45', type: 'Brute Force', severity: 'Critical', time: '5 min ago' },
-  { id: 3, ip: '172.16.0.88', type: 'DDoS Attempt', severity: 'Medium', time: '12 min ago' },
-  { id: 4, ip: '192.168.2.201', type: 'Malware Traffic', severity: 'High', time: '18 min ago' },
-  { id: 5, ip: '10.0.1.33', type: 'Suspicious Request', severity: 'Low', time: '25 min ago' },
-];
+import { alertsAPI, blocklistAPI, whitelistAPI } from '@/services/api';
 
 const severityColors: Record<string, string> = {
-  Low: 'bg-success/10 text-success',
-  Medium: 'bg-warning/10 text-warning',
-  High: 'bg-destructive/10 text-destructive',
-  Critical: 'bg-purple-500/10 text-purple-500',
+  'Low': 'bg-green-500',
+  'Medium': 'bg-yellow-500',
+  'High': 'bg-orange-500',
+  'Critical': 'bg-red-500',
 };
 
 export default function DashboardHome() {
-  const { toast } = useToast();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const { showNotification } = useNotificationPopup();
 
-  // Demo: Show popup notifications for client events
+  const [stats, setStats] = useState({
+    total_today: 0,
+    blocked_threats: 0,
+    whitelisted_count: 0,
+    network_health: 98.5,
+  });
+
+  const [recentAlerts, setRecentAlerts] = useState<any[]>([]);
+  const [lineChartData, setLineChartData] = useState<any[]>([]);
+  const [pieData, setPieData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    const hasShownDemo = sessionStorage.getItem('clientPopupDemo');
-    if (!hasShownDemo) {
-      // Simulate critical alert after 3 seconds
-      const timer1 = setTimeout(() => {
-        showNotification({
-          title: 'Critical Security Alert',
-          message: 'Brute force attack detected from IP 10.0.0.45',
-          type: 'alert',
-          link: '/dashboard/alerts',
-        });
-      }, 3000);
+    loadDashboardData();
+  }, []);
 
-      // Simulate threat blocked after 6 seconds
-      const timer2 = setTimeout(() => {
-        showNotification({
-          title: 'Threat Blocked',
-          message: '43 malicious requests blocked in the last hour',
-          type: 'info',
-          link: '/dashboard/reports',
-        });
-      }, 6000);
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
 
-      sessionStorage.setItem('clientPopupDemo', 'true');
+      // Fetch stats
+      const statsData = await alertsAPI.getStats();
+      setStats({
+        total_today: statsData.total_today || 0,
+        blocked_threats: statsData.blocked_threats || 0,
+        whitelisted_count: 0, // Will fetch separately
+        network_health: 98.5, // Placeholder
+      });
 
-      return () => {
-        clearTimeout(timer1);
-        clearTimeout(timer2);
-      };
+      // Fetch recent alerts
+      const recentData = await alertsAPI.getRecent(5);
+      setRecentAlerts(recentData.recent_alerts || []);
+
+      // Process weekly trend for line chart
+      if (statsData.weekly_trend) {
+        const chartData = statsData.weekly_trend.map((day: any) => ({
+          name: new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' }),
+          alerts: day.alerts,
+          blocked: day.blocked,
+        }));
+        setLineChartData(chartData);
+      }
+
+      // Process severity distribution for pie chart
+      if (statsData.severity_distribution) {
+        const pie = [
+          { name: 'Low', value: statsData.severity_distribution.Low || 0, color: '#22c55e' },
+          { name: 'Medium', value: statsData.severity_distribution.Medium || 0, color: '#f59e0b' },
+          { name: 'High', value: statsData.severity_distribution.High || 0, color: '#ef4444' },
+          { name: 'Critical', value: statsData.severity_distribution.Critical || 0, color: '#7c3aed' },
+        ];
+        setPieData(pie);
+      }
+
+      // Fetch whitelist count
+      const whitelistData = await whitelistAPI.getWhitelist({ per_page: 1 });
+      if (whitelistData.pagination) {
+        setStats(prev => ({ ...prev, whitelisted_count: whitelistData.pagination.total }));
+      }
+
+    } catch (error) {
+      console.error('Failed to load dashboard data:', error);
+      toast({
+        title: 'Error loading dashboard',
+        description: 'Could not fetch dashboard data. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
     }
-  }, [showNotification]);
-
-  const handleAddToBlocklist = (ip: string) => {
-    toast({ title: 'Added to Blocklist', description: `${ip} has been added to your blocklist.` });
   };
 
-  const handleAddToWhitelist = (ip: string) => {
-    toast({ title: 'Added to Whitelist', description: `${ip} has been added to your whitelist.` });
+  const handleBlockIP = async (ip: string) => {
+    try {
+      await blocklistAPI.blockIP(ip, 'Blocked from dashboard');
+      toast({
+        title: 'IP Blocked',
+        description: `Successfully blocked ${ip}`,
+      });
+      showNotification({
+        title: 'IP Blocked',
+        message: `${ip} has been added to the blocklist`,
+        type: 'info',
+      });
+      loadDashboardData(); // Refresh data
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to block IP',
+        variant: 'destructive',
+      });
+    }
   };
+
+  const handleWhitelistIP = async (ip: string) => {
+    try {
+      await whitelistAPI.addIP(ip, 'Whitelisted from dashboard');
+      toast({
+        title: 'IP Whitelisted',
+        description: `Successfully whitelisted ${ip}`,
+      });
+      loadDashboardData();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to whitelist IP',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const statsData = [
+    { title: 'Total Alerts Today', value: stats.total_today.toString(), icon: AlertTriangle, color: 'text-warning' },
+    { title: 'Blocked Threats', value: stats.blocked_threats.toString(), icon: Shield, color: 'text-destructive' },
+    { title: 'Whitelisted IPs', value: stats.whitelisted_count.toString(), icon: CheckCircle, color: 'text-success' },
+    { title: 'Network Health', value: `${stats.network_health}%`, icon: Activity, color: 'text-primary' },
+  ];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-muted-foreground">Loading dashboard...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold mb-2">Welcome back!</h2>
-        <p className="text-muted-foreground">Here's what's happening with your network security.</p>
+        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+        <p className="text-muted-foreground">
+          Welcome back! Here's your security overview.
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Stats Grid */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {statsData.map((stat, index) => (
           <Card key={index}>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">{stat.title}</p>
-                  <p className="text-3xl font-bold mt-1">{stat.value}</p>
-                </div>
-                <div className={`w-12 h-12 rounded-lg bg-muted flex items-center justify-center ${stat.color}`}>
-                  <stat.icon className="w-6 h-6" />
-                </div>
-              </div>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                {stat.title}
+              </CardTitle>
+              <stat.icon className={`h-4 w-4 ${stat.color}`} />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stat.value}</div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2">
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* Line Chart - Weekly Activity */}
+        <Card>
           <CardHeader>
-            <CardTitle>Alerts Overview - Last 7 Days</CardTitle>
+            <CardTitle>Weekly Activity</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={lineChartData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} />
-                  <Line type="monotone" dataKey="alerts" stroke="hsl(var(--primary))" strokeWidth={2} />
-                  <Line type="monotone" dataKey="blocked" stroke="hsl(var(--destructive))" strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={lineChartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Line type="monotone" dataKey="alerts" stroke="#3b82f6" strokeWidth={2} name="Alerts" />
+                <Line type="monotone" dataKey="blocked" stroke="#ef4444" strokeWidth={2} name="Blocked" />
+              </LineChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
 
+        {/* Pie Chart - Severity Distribution */}
         <Card>
           <CardHeader>
             <CardTitle>Severity Distribution</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value">
-                    {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="flex flex-wrap justify-center gap-4 mt-4">
-                {pieData.map((item) => (
-                  <div key={item.name} className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                    <span className="text-sm">{item.name}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={pieData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {pieData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>
 
+
+      {/* Recent Alerts */}
       <Card>
         <CardHeader>
           <CardTitle>Recent Alerts</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">IP Source</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Type</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Severity</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Time</th>
-                  <th className="text-right py-3 px-4 font-medium text-muted-foreground">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentAlerts.map((alert) => (
-                  <tr key={alert.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
-                    <td className="py-3 px-4 font-mono text-sm">{alert.ip}</td>
-                    <td className="py-3 px-4">{alert.type}</td>
-                    <td className="py-3 px-4">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${severityColors[alert.severity]}`}>
-                        {alert.severity}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-muted-foreground text-sm">{alert.time}</td>
-                    <td className="py-3 px-4 text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="sm">Add to List</Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleAddToBlocklist(alert.ip)}>
-                            <Ban className="w-4 h-4 mr-2" />
-                            Add to Blocklist
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleAddToWhitelist(alert.ip)}>
-                            <ShieldCheck className="w-4 h-4 mr-2" />
-                            Add to Whitelist
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-3">
+            {recentAlerts.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8">
+                No recent alerts
+              </div>
+            ) : (
+              recentAlerts.map((alert) => (
+                <div key={alert.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50 transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-2 h-2 rounded-full ${severityColors[alert.severity]}`}></div>
+                    <div>
+                      <div className="font-medium">{alert.ip}</div>
+                      <div className="text-sm text-muted-foreground">{alert.type}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm text-muted-foreground">{alert.time}</span>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">Actions</Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem onClick={() => handleBlockIP(alert.ip)}>
+                          <Ban className="mr-2 h-4 w-4" />
+                          <span>Block IP</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleWhitelistIP(alert.ip)}>
+                          <ShieldCheck className="mr-2 h-4 w-4" />
+                          <span>Whitelist IP</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </CardContent>
       </Card>

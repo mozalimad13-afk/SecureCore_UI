@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecureCore IDS API Documentation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' }
+    </script>
+</head>
+
+<body class="bg-zinc-950 text-zinc-100">
+    <!-- Header -->
+    <div class="sticky top-0 z-50 border-b border-zinc-800 bg-zinc-950/95 backdrop-blur">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="text-3xl">🛡️</div>
+                <div>
+                    <h1
+                        class="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                        SecureCore IDS API
+                    </h1>
+                    <p class="text-sm text-zinc-400">Complete REST API Reference - 38 Endpoints</p>
+                </div>
+            </div>
+            <div class="px-4 py-2 bg-blue-600 text-white rounded-full text-sm font-semibold">v1.0.0</div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8 grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8">
+        <!-- Sidebar -->
+        <aside class="lg:col-span-1">
+            <div class="lg:sticky lg:top-24 space-y-1">
+                <h3 class="text-xs uppercase tracking-wider text-zinc-500 font-semibold mb-3">Navigation</h3>
+                <a href="#intro"
+                    class="nav-link block px-3 py-2 rounded-lg text-sm hover:bg-zinc-800 transition cursor-pointer">📖
+                    Introduction</a>
+                <a href="#auth-info"
+                    class="nav-link block px-3 py-2 rounded-lg text-sm hover:bg-zinc-800 transition cursor-pointer">🔐
+                    Authentication</a>
+                <a href="#auth"
+                    class="nav-link block px-3 py-2 rounded-lg text-sm hover:bg-zinc-800 transition cursor-pointer">👤
+                    Auth (4)</a>
+                <a href="#alerts"
+                    class="nav-link block px-3 py-2 rounded-lg text-sm hover:bg-zinc-800 transition cursor-pointer">🚨
+                    Alerts (4)</a>
+                <a href="#blocklist"
+                    class="nav-link block px-3 py-2 rounded-lg text-sm hover:bg-zinc-800 transition cursor-pointer">🚫
+                    Blocklist (3)</a>
+                <a href="#whitelist"
+                    class="nav-link block px-3 py-2 rounded-lg text-sm hover:bg-zinc-800 transition cursor-pointer">✅
+                    Whitelist (3)</a>
+                <a href="#notifications"
+                    class="nav-link block px-3 py-2 rounded-lg text-sm hover:bg-zinc-800 transition cursor-pointer">🔔
+                    Notifications (3)</a>
+                <a href="#tokens"
+                    class="nav-link block px-3 py-2 rounded-lg text-sm hover:bg-zinc-800 transition cursor-pointer">🔑
+                    Tokens (3)</a>
+                <a href="#settings"
+                    class="nav-link block px-3 py-2 rounded-lg text-sm hover:bg-zinc-800 transition cursor-pointer">⚙️
+                    Settings (3)</a>
+                <a href="#reports"
+                    class="nav-link block px-3 py-2 rounded-lg text-sm hover:bg-zinc-800 transition cursor-pointer">📊
+                    Reports (2)</a>
+                <a href="#subscription"
+                    class="nav-link block px-3 py-2 rounded-lg text-sm hover:bg-zinc-800 transition cursor-pointer">💳
+                    Subscription (1)</a>
+                <a href="#admin"
+                    class="nav-link block px-3 py-2 rounded-lg text-sm hover:bg-zinc-800 transition cursor-pointer">👨‍💼
+                    Admin (5)</a>
+                <a href="#downloads"
+                    class="nav-link block px-3 py-2 rounded-lg text-sm hover:bg-zinc-800 transition cursor-pointer">📥
+                    Downloads (7)</a>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="lg:col-span-3 space-y-12">
+            <!-- Introduction -->
+            <section id="intro"
+                class="bg-gradient-to-br from-zinc-900 to-zinc-950 border border-zinc-800 rounded-xl p-6">
+                <h2 class="text-3xl font-bold mb-4">Welcome to SecureCore IDS API</h2>
+                <p class="text-zinc-300 text-lg leading-relaxed mb-4">
+                    Comprehensive RESTful API for intrusion detection, security alerting, IP management, and system
+                    monitoring.
+                </p>
+                <div class="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
+                    <p class="text-zinc-400 mb-2"><strong class="text-zinc-200">Base URL:</strong></p>
+                    <code class="text-green-400 font-mono">http://localhost:5000/api/v1</code>
+                </div>
+            </section>
+
+            <!-- Authentication Info -->
+            <section id="auth-info" class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                <h3 class="text-2xl font-bold text-blue-400 mb-4">🔐 Authentication</h3>
+                <div class="space-y-3 text-zinc-300">
+                    <div><span class="text-zinc-400 font-semibold">Type:</span> JWT Bearer Token</div>
+                    <div><span class="text-zinc-400 font-semibold">Header:</span> <code
+                            class="bg-zinc-950 px-2 py-1 rounded">Authorization: Bearer &lt;token&gt;</code></div>
+                    <div><span class="text-zinc-400 font-semibold">Get Token:</span> POST /api/v1/auth/login</div>
+                </div>
+            </section>
+
+            <!-- Auth Endpoints (4) -->
+            <section id="auth" class="space-y-6">
+                <div class="border-b border-zinc-800 pb-4">
+                    <h2 class="text-2xl font-bold text-amber-400">👤 Authentication & Users</h2>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-blue-600 text-white rounded font-bold text-xs">POST</span><code
+                            class="text-lg">/auth/register</code></div>
+                    <p class="text-zinc-300 mb-4">Register new user account</p>
+                    <p class="text-xs uppercase text-blue-400 font-bold mb-2">Request</p>
+                    <pre
+                        class="bg-zinc-950 p-3 rounded text-sm mb-3"><code>{ "email": "user@example.com", "password": "pass123", "name": "John" }</code></pre>
+                    <pre
+                        class="bg-zinc-950 p-3 rounded text-sm"><code>{ "message": "User registered", "user_id": 1 }</code></pre>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-blue-600 text-white rounded font-bold text-xs">POST</span><code
+                            class="text-lg">/auth/login</code></div>
+                    <p class="text-zinc-300 mb-4">Login and get JWT token</p>
+                    <pre
+                        class="bg-zinc-950 p-3 rounded text-sm mb-3"><code>{ "email": "user@example.com", "password": "pass123" }</code></pre>
+                    <pre
+                        class="bg-zinc-950 p-3 rounded text-sm"><code>{ "access_token": "eyJ...", "user": {...} }</code></pre>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-blue-600 text-white rounded font-bold text-xs">POST</span><code
+                            class="text-lg">/auth/logout</code><span
+                            class="px-2 py-1 bg-red-600 text-white rounded text-xs">AUTH</span></div>
+                    <p class="text-zinc-300">Logout current session</p>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-green-600 text-white rounded font-bold text-xs">GET</span><code
+                            class="text-lg">/auth/me</code><span
+                            class="px-2 py-1 bg-red-600 text-white rounded text-xs">AUTH</span></div>
+                    <p class="text-zinc-300 mb-3">Get current user info</p>
+                    <pre
+                        class="bg-zinc-950 p-3 rounded text-sm"><code>{ "email": "...", "name": "...", "role": "user" }</code></pre>
+                </div>
+            </section>
+
+            <!-- Alerts (4) -->
+            <section id="alerts" class="space-y-6">
+                <div class="border-b border-zinc-800 pb-4">
+                    <h2 class="text-2xl font-bold text-amber-400">🚨 Security Alerts</h2>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-green-600 text-white rounded font-bold text-xs">GET</span><code
+                            class="text-lg">/alerts?page=1&per_page=15&severity=High</code><span
+                            class="px-2 py-1 bg-red-600 text-white rounded text-xs">AUTH</span></div>
+                    <p class="text-zinc-300 mb-3">Paginated alerts with filtering</p>
+                    <p class="text-xs uppercase text-blue-400 font-bold mb-2">Query Params</p>
+                    <div class="bg-zinc-950 p-3 rounded text-sm mb-3 space-y-1">
+                        <div><code class="text-blue-400">page</code> int - Page number</div>
+                        <div><code class="text-blue-400">per_page</code> int - Items (max 100)</div>
+                        <div><code class="text-blue-400">severity</code> string - Low/Medium/High/Critical</div>
+                    </div>
+                    <pre
+                        class="bg-zinc-950 p-3 rounded text-sm"><code>{ "alerts": [{...}], "pagination": {...} }</code></pre>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-green-600 text-white rounded font-bold text-xs">GET</span><code
+                            class="text-lg">/alerts/stats</code><span
+                            class="px-2 py-1 bg-red-600 text-white rounded text-xs">AUTH</span></div>
+                    <p class="text-zinc-300 mb-3">Dashboard statistics</p>
+                    <pre
+                        class="bg-zinc-950 p-3 rounded text-sm"><code>{ "total_today": 127, "weekly_trend": [...], "severity_distribution": {...} }</code></pre>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-green-600 text-white rounded font-bold text-xs">GET</span><code
+                            class="text-lg">/alerts/recent?limit=5</code><span
+                            class="px-2 py-1 bg-red-600 text-white rounded text-xs">AUTH</span></div>
+                    <p class="text-zinc-300">Recent alerts (max 50)</p>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-amber-600 text-white rounded font-bold text-xs">PUT</span><code
+                            class="text-lg">/alerts/{id}/acknowledge</code><span
+                            class="px-2 py-1 bg-red-600 text-white rounded text-xs">AUTH</span></div>
+                    <p class="text-zinc-300">Mark alert as acknowledged</p>
+                </div>
+            </section>
+
+            <!-- Blocklist (3) -->
+            <section id="blocklist" class="space-y-6">
+                <div class="border-b border-zinc-800 pb-4">
+                    <h2 class="text-2xl font-bold text-amber-400">🚫 IP Blocklist</h2>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-green-600 text-white rounded font-bold text-xs">GET</span><code
+                            class="text-lg">/blocklist?search=192.168</code><span
+                            class="px-2 py-1 bg-red-600 text-white rounded text-xs">AUTH</span></div>
+                    <p class="text-zinc-300">Paginated blocked IPs with search</p>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-blue-600 text-white rounded font-bold text-xs">POST</span><code
+                            class="text-lg">/blocklist</code><span
+                            class="px-2 py-1 bg-red-600 text-white rounded text-xs">AUTH</span></div>
+                    <p class="text-zinc-300 mb-3">Block IP address</p>
+                    <pre
+                        class="bg-zinc-950 p-3 rounded text-sm"><code>{ "ip_address": "192.168.1.100", "reason": "Malicious" }</code></pre>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-red-600 text-white rounded font-bold text-xs">DELETE</span><code
+                            class="text-lg">/blocklist/{id}</code><span
+                            class="px-2 py-1 bg-red-600 text-white rounded text-xs">AUTH</span></div>
+                    <p class="text-zinc-300">Unblock IP</p>
+                </div>
+            </section>
+
+            <!-- Whitelist (3) -->
+            <section id="whitelist" class="space-y-6">
+                <div class="border-b border-zinc-800 pb-4">
+                    <h2 class="text-2xl font-bold text-amber-400">✅ IP Whitelist</h2>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-green-600 text-white rounded font-bold text-xs">GET</span><code
+                            class="text-lg">/whitelist</code><span
+                            class="px-2 py-1 bg-red-600 text-white rounded text-xs">AUTH</span></div>
+                    <p class="text-zinc-300">Paginated trusted IPs</p>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-blue-600 text-white rounded font-bold text-xs">POST</span><code
+                            class="text-lg">/whitelist</code><span
+                            class="px-2 py-1 bg-red-600 text-white rounded text-xs">AUTH</span></div>
+                    <p class="text-zinc-300 mb-3">Add trusted IP</p>
+                    <pre
+                        class="bg-zinc-950 p-3 rounded text-sm"><code>{ "ip_address": "10.0.0.1", "description": "Office" }</code></pre>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-red-600 text-white rounded font-bold text-xs">DELETE</span><code
+                            class="text-lg">/whitelist/{id}</code><span
+                            class="px-2 py-1 bg-red-600 text-white rounded text-xs">AUTH</span></div>
+                    <p class="text-zinc-300">Remove from whitelist</p>
+                </div>
+            </section>
+
+            <!-- Notifications (3) -->
+            <section id="notifications" class="space-y-6">
+                <div class="border-b border-zinc-800 pb-4">
+                    <h2 class="text-2xl font-bold text-amber-400">🔔 Notifications</h2>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-green-600 text-white rounded font-bold text-xs">GET</span><code
+                            class="text-lg">/notifications</code><span
+                            class="px-2 py-1 bg-red-600 text-white rounded text-xs">AUTH</span></div>
+                    <p class="text-zinc-300 mb-3">Get all notifications</p>
+                    <pre
+                        class="bg-zinc-950 p-3 rounded text-sm"><code>{ "notifications": [{"id": "1", "title": "...", "read": false}] }</code></pre>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-amber-600 text-white rounded font-bold text-xs">PUT</span><code
+                            class="text-lg">/notifications/{id}/read</code><span
+                            class="px-2 py-1 bg-red-600 text-white rounded text-xs">AUTH</span></div>
+                    <p class="text-zinc-300">Mark as read</p>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-amber-600 text-white rounded font-bold text-xs">PUT</span><code
+                            class="text-lg">/notifications/read-all</code><span
+                            class="px-2 py-1 bg-red-600 text-white rounded text-xs">AUTH</span></div>
+                    <p class="text-zinc-300">Mark all as read</p>
+                </div>
+            </section>
+
+            <!-- API Tokens (3) -->
+            <section id="tokens" class="space-y-6">
+                <div class="border-b border-zinc-800 pb-4">
+                    <h2 class="text-2xl font-bold text-amber-400">🔑 API Tokens</h2>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-green-600 text-white rounded font-bold text-xs">GET</span><code
+                            class="text-lg">/tokens</code><span
+                            class="px-2 py-1 bg-red-600 text-white rounded text-xs">AUTH</span></div>
+                    <p class="text-zinc-300">List user's tokens</p>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-blue-600 text-white rounded font-bold text-xs">POST</span><code
+                            class="text-lg">/tokens/generate</code><span
+                            class="px-2 py-1 bg-red-600 text-white rounded text-xs">AUTH</span></div>
+                    <p class="text-zinc-300 mb-3">Generate new token</p>
+                    <pre class="bg-zinc-950 p-3 rounded text-sm mb-3"><code>{ "name": "Production API" }</code></pre>
+                    <pre
+                        class="bg-zinc-950 p-3 rounded text-sm"><code>{ "token": "sck_live_...", "api_token": {...} }</code></pre>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-red-600 text-white rounded font-bold text-xs">DELETE</span><code
+                            class="text-lg">/tokens/{id}</code><span
+                            class="px-2 py-1 bg-red-600 text-white rounded text-xs">AUTH</span></div>
+                    <p class="text-zinc-300">Revoke token</p>
+                </div>
+            </section>
+
+            <!-- Settings (3) -->
+            <section id="settings" class="space-y-6">
+                <div class="border-b border-zinc-800 pb-4">
+                    <h2 class="text-2xl font-bold text-amber-400">⚙️ User Settings</h2>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-green-600 text-white rounded font-bold text-xs">GET</span><code
+                            class="text-lg">/settings</code><span
+                            class="px-2 py-1 bg-red-600 text-white rounded text-xs">AUTH</span></div>
+                    <p class="text-zinc-300">Get preferences</p>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-amber-600 text-white rounded font-bold text-xs">PUT</span><code
+                            class="text-lg">/settings</code><span
+                            class="px-2 py-1 bg-red-600 text-white rounded text-xs">AUTH</span></div>
+                    <p class="text-zinc-300 mb-3">Update settings</p>
+                    <pre
+                        class="bg-zinc-950 p-3 rounded text-sm"><code>{ "email_notifications": true, "backup_frequency": "daily" }</code></pre>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-blue-600 text-white rounded font-bold text-xs">POST</span><code
+                            class="text-lg">/settings/backup/run</code><span
+                            class="px-2 py-1 bg-red-600 text-white rounded text-xs">AUTH</span></div>
+                    <p class="text-zinc-300">Run backup</p>
+                </div>
+            </section>
+
+            <!-- Reports (2) -->
+            <section id="reports" class="space-y-6">
+                <div class="border-b border-zinc-800 pb-4">
+                    <h2 class="text-2xl font-bold text-amber-400">📊 PDF Reports</h2>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-blue-600 text-white rounded font-bold text-xs">POST</span><code
+                            class="text-lg">/reports/preview</code><span
+                            class="px-2 py-1 bg-red-600 text-white rounded text-xs">AUTH</span></div>
+                    <p class="text-zinc-300 mb-3">Preview report stats</p>
+                    <pre
+                        class="bg-zinc-950 p-3 rounded text-sm mb-3"><code>{ "start_date": "2024-01-01", "end_date": "2024-01-31" }</code></pre>
+                    <pre
+                        class="bg-zinc-950 p-3 rounded text-sm"><code>{ "preview": { "alert_count": 500, "total_records": 560 } }</code></pre>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-blue-600 text-white rounded font-bold text-xs">POST</span><code
+                            class="text-lg">/reports</code><span
+                            class="px-2 py-1 bg-red-600 text-white rounded text-xs">AUTH</span></div>
+                    <p class="text-zinc-300 mb-3">Generate PDF</p>
+                    <pre
+                        class="bg-zinc-950 p-3 rounded text-sm"><code>{ "start_date": "...", "end_date": "..." }</code></pre>
+                    <p class="text-sm text-zinc-500 mt-2">Returns: application/pdf (binary download)</p>
+                </div>
+            </section>
+
+            <!-- Subscription (1) -->
+            <section id="subscription" class="space-y-6">
+                <div class="border-b border-zinc-800 pb-4">
+                    <h2 class="text-2xl font-bold text-amber-400">💳 Subscription</h2>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-green-600 text-white rounded font-bold text-xs">GET</span><code
+                            class="text-lg">/subscription</code><span
+                            class="px-2 py-1 bg-red-600 text-white rounded text-xs">AUTH</span></div>
+                    <p class="text-zinc-300 mb-3">Get subscription info</p>
+                    <pre
+                        class="bg-zinc-950 p-3 rounded text-sm"><code>{ "plan_name": "Small Companies", "plan_price": 44 }</code></pre>
+                </div>
+            </section>
+
+            <!-- Admin (5) -->
+            <section id="admin" class="space-y-6">
+                <div class="border-b border-zinc-800 pb-4">
+                    <h2 class="text-2xl font-bold text-amber-400">👨‍💼 Admin Panel</h2>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-green-600 text-white rounded font-bold text-xs">GET</span><code
+                            class="text-lg">/admin/users</code><span
+                            class="px-2 py-1 bg-purple-600 text-white rounded text-xs">ADMIN</span></div>
+                    <p class="text-zinc-300">List all users (paginated)</p>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-amber-600 text-white rounded font-bold text-xs">PUT</span><code
+                            class="text-lg">/admin/users/{id}/suspend</code><span
+                            class="px-2 py-1 bg-purple-600 text-white rounded text-xs">ADMIN</span></div>
+                    <p class="text-zinc-300">Suspend user</p>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-amber-600 text-white rounded font-bold text-xs">PUT</span><code
+                            class="text-lg">/admin/users/{id}/activate</code><span
+                            class="px-2 py-1 bg-purple-600 text-white rounded text-xs">ADMIN</span></div>
+                    <p class="text-zinc-300">Activate user</p>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-green-600 text-white rounded font-bold text-xs">GET</span><code
+                            class="text-lg">/admin/stats</code><span
+                            class="px-2 py-1 bg-purple-600 text-white rounded text-xs">ADMIN</span></div>
+                    <p class="text-zinc-300">Admin statistics</p>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-green-600 text-white rounded font-bold text-xs">GET</span><code
+                            class="text-lg">/admin/health</code><span
+                            class="px-2 py-1 bg-purple-600 text-white rounded text-xs">ADMIN</span></div>
+                    <p class="text-zinc-300 mb-3">System health monitoring</p>
+                    <pre
+                        class="bg-zinc-950 p-3 rounded text-sm"><code>{ "overall_status": "healthy", "server": {...}, "database": {...} }</code></pre>
+                </div>
+            </section>
+
+            <!-- Downloads (7) -->
+            <section id="downloads" class="space-y-6">
+                <div class="border-b border-zinc-800 pb-4">
+                    <h2 class="text-2xl font-bold text-amber-400">📥 Downloads</h2>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-green-600 text-white rounded font-bold text-xs">GET</span><code
+                            class="text-lg">/downloads/alerts/csv</code><span
+                            class="px-2 py-1 bg-red-600 text-white rounded text-xs">AUTH</span></div>
+                    <p class="text-zinc-300">Download alerts as CSV</p>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-green-600 text-white rounded font-bold text-xs">GET</span><code
+                            class="text-lg">/downloads/alerts/json</code><span
+                            class="px-2 py-1 bg-red-600 text-white rounded text-xs">AUTH</span></div>
+                    <p class="text-zinc-300">Download alerts as JSON</p>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-green-600 text-white rounded font-bold text-xs">GET</span><code
+                            class="text-lg">/downloads/blocklist/csv</code><span
+                            class="px-2 py-1 bg-red-600 text-white rounded text-xs">AUTH</span></div>
+                    <p class="text-zinc-300">Download blocklist CSV</p>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-green-600 text-white rounded font-bold text-xs">GET</span><code
+                            class="text-lg">/downloads/whitelist/csv</code><span
+                            class="px-2 py-1 bg-red-600 text-white rounded text-xs">AUTH</span></div>
+                    <p class="text-zinc-300">Download whitelist CSV</p>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-green-600 text-white rounded font-bold text-xs">GET</span><code
+                            class="text-lg">/downloads/logs/application</code><span
+                            class="px-2 py-1 bg-purple-600 text-white rounded text-xs">ADMIN</span></div>
+                    <p class="text-zinc-300">Download application logs</p>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-green-600 text-white rounded font-bold text-xs">GET</span><code
+                            class="text-lg">/downloads/logs/security</code><span
+                            class="px-2 py-1 bg-purple-600 text-white rounded text-xs">ADMIN</span></div>
+                    <p class="text-zinc-300">Download security logs</p>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4"><span
+                            class="px-3 py-1 bg-green-600 text-white rounded font-bold text-xs">GET</span><code
+                            class="text-lg">/downloads/database/backup</code><span
+                            class="px-2 py-1 bg-purple-600 text-white rounded text-xs">ADMIN</span></div>
+                    <p class="text-zinc-300">Download database backup</p>
+                </div>
+            </section>
+
+            <!-- Footer -->
+            <div class="border-t border-zinc-800 pt-8 pb-12 text-center text-zinc-500">
+                <p class="text-lg mb-2">SecureCore IDS API Documentation</p>
+                <p class="text-sm">38 Endpoints • JWT Authentication • RESTful</p>
+                <p class="text-sm mt-4">Contact: <a href="mailto:support@securecore.com"
+                        class="text-blue-400 hover:underline">support@securecore.com</a></p>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Smooth navigation
+        document.querySelectorAll('a[href^="#"]').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const target = document.querySelector(link.getAttribute('href'));
+                if (target) target.scrollIntoView({ behavior: 'smooth' });
+            });
+        });
+    </script>
+</body>
+
+</html>

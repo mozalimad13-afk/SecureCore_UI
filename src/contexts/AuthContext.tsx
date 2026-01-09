@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { authAPI, notificationsAPI } from '../services/api';
 
 interface User {
   email: string;
@@ -29,68 +30,80 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const initialNotifications: Notification[] = [
-  { id: '1', title: 'Critical Alert', message: 'Potential intrusion detected from 192.168.1.105', time: '2 min ago', read: false, type: 'alert' },
-  { id: '2', title: 'Weekly Report Ready', message: 'Your weekly security report is now available', time: '1 hour ago', read: false, type: 'info' },
-  { id: '3', title: 'New Login Detected', message: 'Login from a new device in San Francisco', time: '3 hours ago', read: false, type: 'warning' },
-  { id: '4', title: 'System Update', message: 'Scheduled maintenance tonight at 2 AM', time: '5 hours ago', read: true, type: 'info' },
-];
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
+  // Load user on mount
   useEffect(() => {
-    const isAuth = localStorage.getItem('isAuthenticated') === 'true';
-    const role = localStorage.getItem('userRole') as 'user' | 'admin' | null;
-    const storedEmail = localStorage.getItem('userEmail') || '';
-    const storedName = localStorage.getItem('userName') || 'User';
-    
-    if (isAuth && role) {
-      setUser({ email: storedEmail, name: storedName, role });
-    }
+    const loadUser = async () => {
+      try {
+        const userData = await authAPI.getCurrentUser();
+        setUser(userData as User);
+      } catch (error) {
+        console.log('Not authenticated');
+      }
+    };
+    loadUser();
   }, []);
 
+  // Load notifications when user is authenticated
+  useEffect(() => {
+    const loadNotifications = async () => {
+      if (!user) return;
+      
+      try {
+        const data = await notificationsAPI.getNotifications();
+        setNotifications(data.notifications || []);
+      } catch (error) {
+        console.error('Failed to load notifications:', error);
+      }
+    };
+    
+    loadNotifications();
+    // Poll for new notifications every 30 seconds
+    const interval = setInterval(loadNotifications, 30000);
+    return () => clearInterval(interval);
+  }, [user]);
+
   const login = async (email: string, password: string): Promise<{ success: boolean; role: 'user' | 'admin' }> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        if (email === 'admin@securecore.com' && password === 'admin123') {
-          const userData = { email, name: 'Administrator', role: 'admin' as const };
-          setUser(userData);
-          localStorage.setItem('isAuthenticated', 'true');
-          localStorage.setItem('userRole', 'admin');
-          localStorage.setItem('userEmail', email);
-          localStorage.setItem('userName', 'Administrator');
-          resolve({ success: true, role: 'admin' });
-        } else if (email && password) {
-          const userData = { email, name: email.split('@')[0], role: 'user' as const };
-          setUser(userData);
-          localStorage.setItem('isAuthenticated', 'true');
-          localStorage.setItem('userRole', 'user');
-          localStorage.setItem('userEmail', email);
-          localStorage.setItem('userName', email.split('@')[0]);
-          resolve({ success: true, role: 'user' });
-        } else {
-          resolve({ success: false, role: 'user' });
-        }
-      }, 1000);
-    });
+    try {
+      await authAPI.login(email, password);
+      const userData = await authAPI.getCurrentUser();
+      setUser(userData as User);
+      return { success: true, role: userData.role as 'user' | 'admin' };
+    } catch (error) {
+      console.error('Login failed:', error);
+      return { success: false, role: 'user' };
+    }
   };
 
   const logout = () => {
+    authAPI.logout().catch(console.error);
     setUser(null);
-    localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('userRole');
-    localStorage.removeItem('userEmail');
-    localStorage.removeItem('userName');
+    setNotifications([]);
   };
 
-  const markAsRead = (id: string) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  const markAsRead = async (id: string) => {
+    try {
+      await notificationsAPI.markAsRead(id);
+      setNotifications(prev =>
+        prev.map(n => n.id === id ? { ...n, read: true } : n)
+      );
+    } catch (error) {
+      console.error('Failed to mark as read:', error);
+    }
   };
 
-  const markAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  const markAllAsRead = async () => {
+    try {
+      await notificationsAPI.markAllAsRead();
+      setNotifications(prev =>
+        prev.map(n => ({ ...n, read: true }))
+      );
+    } catch (error) {
+      console.error('Failed to mark all as read:', error);
+    }
   };
 
   const addNotification = (notification: Omit<Notification, 'id' | 'read'>) => {
@@ -105,10 +118,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      isAuthenticated: !!user, 
-      login, 
+    <AuthContext.Provider value={{
+      user,
+      isAuthenticated: !!user,
+      login,
       logout,
       notifications,
       unreadCount,
@@ -123,8 +136,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider');
   }
   return context;
 }
