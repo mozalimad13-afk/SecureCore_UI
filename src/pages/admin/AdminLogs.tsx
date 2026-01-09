@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { 
   Select, 
@@ -18,8 +19,16 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import { Search, Download, FileText, RefreshCw } from 'lucide-react';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Search, Download, FileText, RefreshCw, Calendar as CalendarIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 const LOGS_PER_PAGE = 15;
 
@@ -45,12 +54,12 @@ const generateLogs = () => {
     '198.51.100.23',
   ];
 
-  return Array.from({ length: 50 }, (_, i) => {
+  return Array.from({ length: 100 }, (_, i) => {
     const method = methods[Math.floor(Math.random() * methods.length)];
     const status = statusCodes[Math.floor(Math.random() * statusCodes.length)];
     const path = paths[Math.floor(Math.random() * paths.length)];
     const ip = ips[Math.floor(Math.random() * ips.length)];
-    const timestamp = new Date(Date.now() - i * 60000 * Math.random() * 10);
+    const timestamp = new Date(Date.now() - i * 60000 * Math.random() * 60);
     const responseTime = Math.floor(Math.random() * 500) + 10;
     const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
 
@@ -91,6 +100,8 @@ export default function AdminLogs() {
   const [methodFilter, setMethodFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [fromDate, setFromDate] = useState<Date | undefined>(undefined);
+  const [toDate, setToDate] = useState<Date | undefined>(undefined);
   const { toast } = useToast();
 
   const filteredLogs = logs.filter(log => {
@@ -103,7 +114,13 @@ export default function AdminLogs() {
       (statusFilter === '3xx' && log.status >= 300 && log.status < 400) ||
       (statusFilter === '4xx' && log.status >= 400 && log.status < 500) ||
       (statusFilter === '5xx' && log.status >= 500);
-    return matchesSearch && matchesMethod && matchesStatus;
+    
+    // Date filter
+    const logDate = new Date(log.timestamp);
+    const matchesFromDate = !fromDate || logDate >= fromDate;
+    const matchesToDate = !toDate || logDate <= new Date(toDate.getTime() + 24 * 60 * 60 * 1000);
+    
+    return matchesSearch && matchesMethod && matchesStatus && matchesFromDate && matchesToDate;
   });
 
   const totalPages = Math.ceil(filteredLogs.length / LOGS_PER_PAGE);
@@ -115,6 +132,21 @@ export default function AdminLogs() {
   // Reset to page 1 when filters change
   const handleFilterChange = (setter: (value: string) => void, value: string) => {
     setter(value);
+    setCurrentPage(1);
+  };
+
+  const handleDateChange = (type: 'from' | 'to', date: Date | undefined) => {
+    if (type === 'from') {
+      setFromDate(date);
+    } else {
+      setToDate(date);
+    }
+    setCurrentPage(1);
+  };
+
+  const clearDateFilters = () => {
+    setFromDate(undefined);
+    setToDate(undefined);
     setCurrentPage(1);
   };
 
@@ -179,14 +211,14 @@ export default function AdminLogs() {
           <h2 className="text-2xl font-bold mb-2">HTTP Logs</h2>
           <p className="text-muted-foreground">View Nginx-style HTTP request logs from the server.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={handleRefresh}>
             <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
+            <span className="hidden sm:inline">Refresh</span>
           </Button>
           <Button variant="outline" onClick={handleExport}>
             <Download className="w-4 h-4 mr-2" />
-            Export
+            <span className="hidden sm:inline">Export</span>
           </Button>
         </div>
       </div>
@@ -194,40 +226,101 @@ export default function AdminLogs() {
       {/* Filters */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input 
-                placeholder="Search by path or IP..." 
-                className="pl-10"
-                value={searchTerm}
-                onChange={(e) => handleFilterChange(setSearchTerm, e.target.value)}
-              />
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input 
+                  placeholder="Search by path or IP..." 
+                  className="pl-10"
+                  value={searchTerm}
+                  onChange={(e) => handleFilterChange(setSearchTerm, e.target.value)}
+                />
+              </div>
+              <Select value={methodFilter} onValueChange={(v) => handleFilterChange(setMethodFilter, v)}>
+                <SelectTrigger className="w-full md:w-[150px]">
+                  <SelectValue placeholder="Method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Methods</SelectItem>
+                  <SelectItem value="GET">GET</SelectItem>
+                  <SelectItem value="POST">POST</SelectItem>
+                  <SelectItem value="PUT">PUT</SelectItem>
+                  <SelectItem value="DELETE">DELETE</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={statusFilter} onValueChange={(v) => handleFilterChange(setStatusFilter, v)}>
+                <SelectTrigger className="w-full md:w-[150px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="2xx">2xx Success</SelectItem>
+                  <SelectItem value="3xx">3xx Redirect</SelectItem>
+                  <SelectItem value="4xx">4xx Client Error</SelectItem>
+                  <SelectItem value="5xx">5xx Server Error</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <Select value={methodFilter} onValueChange={(v) => handleFilterChange(setMethodFilter, v)}>
-              <SelectTrigger className="w-full md:w-[150px]">
-                <SelectValue placeholder="Method" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Methods</SelectItem>
-                <SelectItem value="GET">GET</SelectItem>
-                <SelectItem value="POST">POST</SelectItem>
-                <SelectItem value="PUT">PUT</SelectItem>
-                <SelectItem value="DELETE">DELETE</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={statusFilter} onValueChange={(v) => handleFilterChange(setStatusFilter, v)}>
-              <SelectTrigger className="w-full md:w-[150px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="2xx">2xx Success</SelectItem>
-                <SelectItem value="3xx">3xx Redirect</SelectItem>
-                <SelectItem value="4xx">4xx Client Error</SelectItem>
-                <SelectItem value="5xx">5xx Server Error</SelectItem>
-              </SelectContent>
-            </Select>
+
+            {/* Date Range Filter */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <Label className="text-sm font-medium whitespace-nowrap">Time Filter:</Label>
+              <div className="flex flex-wrap items-center gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full sm:w-[160px] justify-start text-left font-normal",
+                        !fromDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {fromDate ? format(fromDate, "PP") : "From"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={fromDate}
+                      onSelect={(date) => handleDateChange('from', date)}
+                      initialFocus
+                      className="pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+                <span className="text-muted-foreground">to</span>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full sm:w-[160px] justify-start text-left font-normal",
+                        !toDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {toDate ? format(toDate, "PP") : "To"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={toDate}
+                      onSelect={(date) => handleDateChange('to', date)}
+                      initialFocus
+                      className="pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+                {(fromDate || toDate) && (
+                  <Button variant="ghost" size="sm" onClick={clearDateFilters}>
+                    Clear
+                  </Button>
+                )}
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -249,9 +342,9 @@ export default function AdminLogs() {
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Method</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Path</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">IP</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Time</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Size</th>
+                  <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">IP</th>
+                  <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden lg:table-cell">Time</th>
+                  <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden lg:table-cell">Size</th>
                 </tr>
               </thead>
               <tbody className="font-mono text-xs">
@@ -271,9 +364,9 @@ export default function AdminLogs() {
                         {log.status}
                       </Badge>
                     </td>
-                    <td className="py-2 px-4">{log.ip}</td>
-                    <td className="py-2 px-4">{log.responseTime}ms</td>
-                    <td className="py-2 px-4">{(log.size / 1024).toFixed(1)}KB</td>
+                    <td className="py-2 px-4 hidden md:table-cell">{log.ip}</td>
+                    <td className="py-2 px-4 hidden lg:table-cell">{log.responseTime}ms</td>
+                    <td className="py-2 px-4 hidden lg:table-cell">{(log.size / 1024).toFixed(1)}KB</td>
                   </tr>
                 ))}
               </tbody>

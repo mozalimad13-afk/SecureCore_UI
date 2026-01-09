@@ -1,8 +1,19 @@
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Bell, AlertTriangle, Info, AlertCircle, Check, Trash2 } from 'lucide-react';
+import { Bell, AlertTriangle, Info, AlertCircle, Check } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
+
+const ITEMS_PER_PAGE = 15;
 
 const typeIcons = {
   alert: AlertTriangle,
@@ -24,6 +35,39 @@ const typeBgColors = {
 
 export default function NotificationsPage() {
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useAuth();
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const totalPages = Math.ceil(notifications.length / ITEMS_PER_PAGE);
+  const paginatedNotifications = notifications.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  const renderPaginationItems = () => {
+    const items = [];
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+    if (endPage - startPage + 1 < maxVisiblePages) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      items.push(
+        <PaginationItem key={i}>
+          <PaginationLink
+            onClick={() => setCurrentPage(i)}
+            isActive={currentPage === i}
+            className="cursor-pointer"
+          >
+            {i}
+          </PaginationLink>
+        </PaginationItem>
+      );
+    }
+    return items;
+  };
 
   return (
     <div className="space-y-6">
@@ -57,50 +101,75 @@ export default function NotificationsPage() {
               <p className="text-sm">You'll see security alerts and updates here</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {notifications.map((notification) => {
-                const Icon = typeIcons[notification.type];
-                return (
-                  <div
-                    key={notification.id}
-                    className={cn(
-                      'flex items-start gap-4 p-4 rounded-lg border border-border transition-colors',
-                      !notification.read && 'bg-primary/5 border-primary/20'
-                    )}
-                  >
-                    <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center', typeBgColors[notification.type])}>
-                      <Icon className={cn('w-5 h-5', typeColors[notification.type])} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <p className={cn('font-medium', !notification.read && 'text-foreground')}>
-                            {notification.title}
-                          </p>
-                          <p className="text-sm text-muted-foreground mt-1">{notification.message}</p>
-                          <p className="text-xs text-muted-foreground mt-2">{notification.time}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {!notification.read && (
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={() => markAsRead(notification.id)}
-                            >
-                              <Check className="w-4 h-4 mr-1" />
-                              Mark read
-                            </Button>
-                          )}
+            <>
+              <div className="space-y-3">
+                {paginatedNotifications.map((notification) => {
+                  const Icon = typeIcons[notification.type];
+                  return (
+                    <div
+                      key={notification.id}
+                      className={cn(
+                        'flex flex-col sm:flex-row sm:items-start gap-4 p-4 rounded-lg border border-border transition-colors',
+                        !notification.read && 'bg-primary/5 border-primary/20'
+                      )}
+                    >
+                      <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0', typeBgColors[notification.type])}>
+                        <Icon className={cn('w-5 h-5', typeColors[notification.type])} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 sm:gap-4">
+                          <div className="flex-1 min-w-0">
+                            <p className={cn('font-medium', !notification.read && 'text-foreground')}>
+                              {notification.title}
+                            </p>
+                            <p className="text-sm text-muted-foreground mt-1">{notification.message}</p>
+                            <p className="text-xs text-muted-foreground mt-2">{notification.time}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {!notification.read && (
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={() => markAsRead(notification.id)}
+                              >
+                                <Check className="w-4 h-4 mr-1" />
+                                Mark read
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </div>
+                      {!notification.read && (
+                        <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0 hidden sm:block mt-2" />
+                      )}
                     </div>
-                    {!notification.read && (
-                      <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-2" />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="mt-6 pt-4 border-t border-border">
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious
+                          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                          className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                        />
+                      </PaginationItem>
+                      {renderPaginationItems()}
+                      <PaginationItem>
+                        <PaginationNext
+                          onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                          className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
