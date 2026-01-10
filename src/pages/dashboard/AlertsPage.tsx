@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { alertsAPI, blocklistAPI, whitelistAPI } from '@/services/api';
+import { Alert, Pagination as PaginationType } from '@/types';
 
 const severityColors: Record<string, string> = {
   Low: 'bg-success/10 text-success',
@@ -35,21 +36,17 @@ const severityColors: Record<string, string> = {
 };
 
 export default function AlertsPage() {
-  const [alerts, setAlerts] = useState<any[]>([]);
-  const [pagination, setPagination] = useState({ page: 1, per_page: 15, total: 0, pages: 0 });
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [pagination, setPagination] = useState<PaginationType>({ page: 1, per_page: 15, total: 0, pages: 0 });
   const [searchTerm, setSearchTerm] = useState('');
   const [severityFilter, setSeverityFilter] = useState('all');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    loadAlerts();
-  }, [pagination.page, severityFilter]);
-
-  const loadAlerts = async () => {
+  const loadAlerts = useCallback(async () => {
     try {
       setLoading(true);
-      const params: any = {
+      const params: { page: number; per_page: number; severity?: string } = {
         page: pagination.page,
         per_page: pagination.per_page,
       };
@@ -71,7 +68,11 @@ export default function AlertsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.page, pagination.per_page, severityFilter, toast]);
+
+  useEffect(() => {
+    loadAlerts();
+  }, [loadAlerts]);
 
   const handleSearch = () => {
     setPagination(prev => ({ ...prev, page: 1 }));

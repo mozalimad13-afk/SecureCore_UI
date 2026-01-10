@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, ReactNode, useCallback, useState } from 'react';
 import { NotificationPopup, NotificationContainer } from '@/components/NotificationPopup';
 
@@ -23,7 +24,7 @@ export function NotificationPopupProvider({ children }: { children: ReactNode })
   const showNotification = useCallback((notification: Omit<PopupNotification, 'id'>) => {
     const id = `popup-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const newPopup: PopupNotification = { ...notification, id };
-    
+
     setPopups(prev => [...prev, newPopup]);
 
     // Auto-dismiss after 5 seconds

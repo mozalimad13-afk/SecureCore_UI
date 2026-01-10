@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,10 +6,15 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Bell, Send, Users, User, Clock, CheckCircle, Search, X, AlertTriangle, Info, AlertCircle, Activity, UserPlus, Check } from 'lucide-react';
+import { Bell, Send, Users, User, Clock, CheckCircle, Search, X, AlertTriangle, Info, AlertCircle, Activity, UserPlus, Check, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { useSearchParams } from 'react-router-dom';
+import { adminAPI, notificationsAPI } from '@/services/api';
+import { User as UserType, Notification as AppNotification, AdminBroadcast } from '@/types';
+import { format } from 'date-fns';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   Select,
   SelectContent,
@@ -101,30 +106,73 @@ const priorityColors = {
   critical: 'text-destructive',
 };
 
+// Map backend types to local UI types
+const mapType = (type: string): 'user' | 'system' | 'security' | 'alert' => {
+  if (type === 'user_registration') return 'user';
+  if (type === 'system_health') return 'system';
+  if (type === 'security') return 'security';
+  return 'alert';
+};
+
 export default function AdminNotifications() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const defaultTab = searchParams.get('tab') || 'send';
+
   const [notificationType, setNotificationType] = useState<'all' | 'single' | 'selected'>('all');
-  const [selectedUsers, setSelectedUsers] = useState<typeof allUsers>([]);
-  const [singleUser, setSingleUser] = useState<typeof allUsers[0] | null>(null);
+  const [selectedUsers, setSelectedUsers] = useState<UserType[]>([]);
+  const [singleUser, setSingleUser] = useState<UserType | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
 
-  // System Notifications State
-  const [systemNotifications, setSystemNotifications] = useState<AdminNotification[]>(adminSystemNotifications);
+  // System Notifications State (admin's inbox)
+  const [systemNotifications, setSystemNotifications] = useState<(AppNotification & { priority: string; time: string })[]>([]);
+  const [history, setHistory] = useState<AdminBroadcast[]>([]);
+  const [allUsers, setAllUsers] = useState<UserType[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const [typeFilter, setTypeFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
-  
+
   const unreadCount = systemNotifications.filter(n => !n.read).length;
 
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [usersRes, historyRes, notesRes] = await Promise.all([
+          adminAPI.getUsers({ per_page: 100 }),
+          adminAPI.getNotificationHistory(),
+          notificationsAPI.getNotifications()
+        ]);
+
+        setAllUsers(usersRes.users);
+        setHistory(historyRes.history);
+        setSystemNotifications(notesRes.notifications.map((n: AppNotification) => ({
+          ...n,
+          type: mapType(n.related_type || n.type),
+          priority: n.type === 'alert' ? 'high' : 'medium',
+          time: n.created_at ? format(new Date(n.created_at), 'MMM d, p') : 'Just now'
+        })));
+      } catch (error) {
+        console.error('Failed to fetch admin notification data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user]);
+
   const filteredUsers = useMemo(() => {
-    return allUsers.filter(user =>
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.company.toLowerCase().includes(searchTerm.toLowerCase())
+    return allUsers.filter(u =>
+      u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      u.email.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [searchTerm]);
+  }, [searchTerm, allUsers]);
 
   const filteredNotifications = useMemo(() => {
     return systemNotifications.filter(notification => {
@@ -140,15 +188,25 @@ export default function AdminNotifications() {
     currentPage * ITEMS_PER_PAGE
   );
 
-  const handleMarkAsRead = (id: number) => {
-    setSystemNotifications(prev =>
-      prev.map(n => n.id === id ? { ...n, read: true } : n)
-    );
+  const handleMarkAsRead = async (id: string) => {
+    try {
+      await notificationsAPI.markAsRead(id);
+      setSystemNotifications(prev =>
+        prev.map(n => n.id.toString() === id.toString() ? { ...n, read: true } : n)
+      );
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to mark as read', variant: 'destructive' });
+    }
   };
 
-  const handleMarkAllAsRead = () => {
-    setSystemNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    toast({ title: 'All notifications marked as read' });
+  const handleMarkAllAsRead = async () => {
+    try {
+      await notificationsAPI.markAllAsRead();
+      setSystemNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      toast({ title: 'All notifications marked as read' });
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to mark all as read', variant: 'destructive' });
+    }
   };
 
   const handleFilterChange = (value: string) => {
@@ -182,7 +240,7 @@ export default function AdminNotifications() {
     return items;
   };
 
-  const handleSelectUser = (user: typeof allUsers[0]) => {
+  const handleSelectUser = (user: UserType) => {
     if (notificationType === 'single') {
       setSingleUser(user);
       setSearchTerm('');
@@ -194,7 +252,7 @@ export default function AdminNotifications() {
     }
   };
 
-  const handleRemoveUser = (userId: string) => {
+  const handleRemoveUser = (userId: number) => {
     if (notificationType === 'single') {
       setSingleUser(null);
     } else {
@@ -202,7 +260,7 @@ export default function AdminNotifications() {
     }
   };
 
-  const handleSendNotification = () => {
+  const handleSendNotification = async () => {
     if (!title.trim() || !message.trim()) {
       toast({ title: 'Error', description: 'Please fill in all fields', variant: 'destructive' });
       return;
@@ -219,30 +277,39 @@ export default function AdminNotifications() {
     }
 
     setIsSending(true);
-    setTimeout(() => {
-      let targetDescription = '';
-      switch (notificationType) {
-        case 'all':
-          targetDescription = 'all users';
-          break;
-        case 'single':
-          targetDescription = singleUser?.name || 'selected user';
-          break;
-        case 'selected':
-          targetDescription = `${selectedUsers.length} users`;
-          break;
-      }
+    try {
+      const target_ids = notificationType === 'single'
+        ? [singleUser!.id]
+        : notificationType === 'selected'
+          ? selectedUsers.map(u => u.id)
+          : [];
 
-      toast({ 
-        title: 'Notification Sent!', 
-        description: `Successfully sent to ${targetDescription}` 
+      await adminAPI.sendNotification({
+        title,
+        message,
+        target_type: notificationType,
+        target_ids
       });
+
+      toast({
+        title: 'Notification Sent!',
+        description: `Successfully broadcasted notification.`
+      });
+
       setTitle('');
       setMessage('');
       setSelectedUsers([]);
       setSingleUser(null);
+
+      // Refresh history
+      const historyRes = await adminAPI.getNotificationHistory();
+      setHistory(historyRes.history);
+
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to send notification', variant: 'destructive' });
+    } finally {
       setIsSending(false);
-    }, 1500);
+    }
   };
 
   return (
@@ -252,7 +319,7 @@ export default function AdminNotifications() {
         <p className="text-muted-foreground">Manage admin notifications and send messages to users.</p>
       </div>
 
-      <Tabs defaultValue="send" className="space-y-6">
+      <Tabs defaultValue={defaultTab} className="space-y-6" onValueChange={(v) => setSearchParams({ tab: v })}>
         <TabsList>
           <TabsTrigger value="system">System Notifications</TabsTrigger>
           <TabsTrigger value="send">Send Notification</TabsTrigger>
@@ -294,7 +361,7 @@ export default function AdminNotifications() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Bell className="w-5 h-5" />
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Bell className="w-5 h-5" />}
                 Notifications ({filteredNotifications.length})
               </CardTitle>
             </CardHeader>
@@ -328,8 +395,8 @@ export default function AdminNotifications() {
                                   <p className={cn('font-medium', !notification.read && 'text-foreground')}>
                                     {notification.title}
                                   </p>
-                                  <Badge 
-                                    variant="outline" 
+                                  <Badge
+                                    variant="outline"
                                     className={cn('text-xs', priorityColors[notification.priority])}
                                   >
                                     {notification.priority}
@@ -340,10 +407,10 @@ export default function AdminNotifications() {
                               </div>
                               <div className="flex items-center gap-2">
                                 {!notification.read && (
-                                  <Button 
-                                    variant="ghost" 
+                                  <Button
+                                    variant="ghost"
                                     size="sm"
-                                    onClick={() => handleMarkAsRead(notification.id)}
+                                    onClick={() => handleMarkAsRead(notification.id.toString())}
                                   >
                                     <Check className="w-4 h-4 mr-1" />
                                     Mark read
@@ -435,7 +502,7 @@ export default function AdminNotifications() {
                   <Label>
                     {notificationType === 'single' ? 'Select User' : `Select Users (${selectedUsers.length} selected)`}
                   </Label>
-                  
+
                   {/* Selected Users Display */}
                   {notificationType === 'single' && singleUser && (
                     <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg">
@@ -454,7 +521,7 @@ export default function AdminNotifications() {
                       {selectedUsers.map(user => (
                         <Badge key={user.id} variant="secondary" className="flex items-center gap-1 pr-1">
                           {user.name}
-                          <button 
+                          <button
                             onClick={() => handleRemoveUser(user.id)}
                             className="ml-1 hover:bg-muted rounded-full p-0.5"
                           >
@@ -475,7 +542,7 @@ export default function AdminNotifications() {
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                       />
-                      
+
                       {/* Search Results Dropdown */}
                       {searchTerm && (
                         <Card className="absolute z-10 w-full mt-1 shadow-lg">
@@ -487,9 +554,8 @@ export default function AdminNotifications() {
                                     key={user.id}
                                     onClick={() => handleSelectUser(user)}
                                     disabled={selectedUsers.find(u => u.id === user.id) !== undefined}
-                                    className={`w-full text-left px-3 py-2 rounded-md hover:bg-muted transition-colors ${
-                                      selectedUsers.find(u => u.id === user.id) ? 'opacity-50 cursor-not-allowed' : ''
-                                    }`}
+                                    className={`w-full text-left px-3 py-2 rounded-md hover:bg-muted transition-colors ${selectedUsers.find(u => u.id === user.id) ? 'opacity-50 cursor-not-allowed' : ''
+                                      }`}
                                   >
                                     <p className="font-medium">{user.name}</p>
                                     <p className="text-sm text-muted-foreground">{user.email} • {user.company}</p>
@@ -531,8 +597,8 @@ export default function AdminNotifications() {
                 />
               </div>
 
-              <Button 
-                onClick={handleSendNotification} 
+              <Button
+                onClick={handleSendNotification}
                 disabled={isSending}
                 className="w-full"
               >
@@ -554,27 +620,33 @@ export default function AdminNotifications() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Clock className="w-5 h-5" />
-                Sent Notifications
+                Sent Notifications ({history.length})
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {sentNotifications.map((notification) => (
+                {history.map((notification) => (
                   <div key={notification.id} className="p-4 rounded-lg border border-border">
                     <div className="flex items-start justify-between mb-2">
                       <h4 className="font-semibold">{notification.title}</h4>
-                      <Badge variant="default" className="bg-success text-success-foreground">
-                        {notification.status}
+                      <Badge variant="default" className="bg-primary/20 text-primary hover:bg-primary/20">
+                        {notification.target}
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground mb-2">{notification.message}</p>
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                      <span>To: {notification.target}</span>
+                      <span>Recipients: {notification.recipient_count}</span>
                       <span>•</span>
-                      <span>{notification.sentAt}</span>
+                      <span>{notification.sent_at}</span>
                     </div>
                   </div>
                 ))}
+                {history.length === 0 && (
+                  <div className="py-12 text-center text-muted-foreground">
+                    <Clock className="w-12 h-12 mx-auto mb-4 opacity-30" />
+                    <p>No send history yet</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

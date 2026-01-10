@@ -13,6 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { authAPI } from '@/services/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 const plans = [
   { id: 'free-trial', name: 'Free Trial', price: '$0', period: '14 days' },
@@ -23,10 +25,10 @@ const plans = [
 export default function Register() {
   const [searchParams] = useSearchParams();
   const initialPlan = searchParams.get('plan') || 'free-trial';
-  
+
   const [step, setStep] = useState<'signup' | 'payment'>('signup');
   const [selectedPlan, setSelectedPlan] = useState(initialPlan);
-  
+
   const [signupData, setSignupData] = useState({
     firstName: '',
     lastName: '',
@@ -36,7 +38,7 @@ export default function Register() {
     password: '',
     confirmPassword: '',
   });
-  
+
   const [paymentData, setPaymentData] = useState({
     cardNumber: '',
     cardName: '',
@@ -48,11 +50,12 @@ export default function Register() {
     zipCode: '',
     country: '',
   });
-  
+
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { login } = useAuth();
 
   const handleSignupChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSignupData({ ...signupData, [e.target.name]: e.target.value });
@@ -64,43 +67,72 @@ export default function Register() {
 
   const handleSignupNext = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (signupData.password !== signupData.confirmPassword) {
       toast({ title: 'Error', description: 'Passwords do not match', variant: 'destructive' });
       return;
     }
-    
+
     if (signupData.password.length < 8) {
       toast({ title: 'Error', description: 'Password must be at least 8 characters', variant: 'destructive' });
       return;
     }
-    
+
     setStep('payment');
   };
 
   const handleSubmitAll = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validate payment info
-    if (!paymentData.cardNumber || !paymentData.cardName || !paymentData.expiryMonth || 
-        !paymentData.expiryYear || !paymentData.cvv) {
+    if (!paymentData.cardNumber || !paymentData.cardName || !paymentData.expiryMonth ||
+      !paymentData.expiryYear || !paymentData.cvv) {
       toast({ title: 'Error', description: 'Please fill in all payment fields', variant: 'destructive' });
       return;
     }
 
     setIsLoading(true);
 
-    // Simulated registration - submit both signup AND payment together
-    setTimeout(() => {
-      localStorage.setItem('userRole', 'user');
-      localStorage.setItem('isAuthenticated', 'true');
-      toast({ 
-        title: 'Account created!', 
-        description: 'Welcome to SecureCore. Redirecting to dashboard...' 
+    // Submit registration with payment data
+    try {
+      await authAPI.register(
+        signupData.email,
+        signupData.password,
+        `${signupData.firstName} ${signupData.lastName}`,
+        {
+          payment_data: {
+            card_number: paymentData.cardNumber,
+            card_name: paymentData.cardName,
+            expiry_month: paymentData.expiryMonth,
+            expiry_year: paymentData.expiryYear,
+            billing_address: paymentData.billingAddress,
+            city: paymentData.city,
+            zip_code: paymentData.zipCode,
+            country: paymentData.country
+          },
+          company: signupData.company,
+          phone: signupData.phone,
+          plan: selectedPlan
+        }
+      );
+
+      // Auto login after registration
+      await login(signupData.email, signupData.password);
+
+      toast({
+        title: 'Account created!',
+        description: 'Welcome to SecureCore. Redirecting to dashboard...'
       });
       navigate('/dashboard');
+    } catch (error) {
+      toast({
+        title: 'Registration failed',
+        description: error instanceof Error ? error.message : 'Please check your details and try again',
+        variant: 'destructive'
+      });
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   const selectedPlanData = plans.find(p => p.id === selectedPlan);
@@ -118,11 +150,11 @@ export default function Register() {
             {step === 'signup' ? 'Create your account' : 'Payment Information'}
           </CardTitle>
           <CardDescription>
-            {step === 'signup' 
-              ? `Start with ${selectedPlanData?.name} - ${selectedPlanData?.price}${selectedPlanData?.period}` 
+            {step === 'signup'
+              ? `Start with ${selectedPlanData?.name} - ${selectedPlanData?.price}${selectedPlanData?.period}`
               : 'Complete your registration with payment details'}
           </CardDescription>
-          
+
           {/* Step Indicator */}
           <div className="flex items-center justify-center gap-4 mt-4">
             <div className={`flex items-center gap-2 ${step === 'signup' ? 'text-primary' : 'text-muted-foreground'}`}>
@@ -140,7 +172,7 @@ export default function Register() {
             </div>
           </div>
         </CardHeader>
-        
+
         <CardContent>
           {step === 'signup' ? (
             <form onSubmit={handleSignupNext} className="space-y-4">
@@ -160,7 +192,7 @@ export default function Register() {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="firstName">First name</Label>
@@ -269,7 +301,7 @@ export default function Register() {
                   <p className="text-xl font-bold">{selectedPlanData?.price}<span className="text-sm font-normal text-muted-foreground">{selectedPlanData?.period}</span></p>
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="cardNumber" className="flex items-center gap-2">
                   <CreditCard className="w-4 h-4" />
@@ -284,7 +316,7 @@ export default function Register() {
                   required
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="cardName">Cardholder Name</Label>
                 <Input
@@ -296,7 +328,7 @@ export default function Register() {
                   required
                 />
               </div>
-              
+
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="expiryMonth">Month</Label>
@@ -344,7 +376,7 @@ export default function Register() {
                   />
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="billingAddress">Billing Address</Label>
                 <Input
@@ -356,7 +388,7 @@ export default function Register() {
                   required
                 />
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="city">City</Label>
@@ -381,7 +413,7 @@ export default function Register() {
                   />
                 </div>
               </div>
-              
+
               <div className="flex gap-4">
                 <Button type="button" variant="outline" onClick={() => setStep('signup')} className="flex-1">
                   <ArrowLeft className="w-4 h-4 mr-2" />
@@ -393,7 +425,7 @@ export default function Register() {
               </div>
             </form>
           )}
-          
+
           <p className="mt-4 text-xs text-muted-foreground text-center">
             By signing up, you agree to our{' '}
             <Link to="/terms" className="text-primary hover:underline">Terms of Service</Link>

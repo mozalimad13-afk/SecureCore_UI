@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,10 +20,11 @@ import {
 } from '@/components/ui/pagination';
 import { useToast } from '@/hooks/use-toast';
 import { whitelistAPI } from '@/services/api';
+import { WhitelistIP, Pagination as PaginationType } from '@/types';
 
 export default function WhitelistPage() {
-  const [whitelistedIPs, setWhitelistedIPs] = useState<any[]>([]);
-  const [pagination, setPagination] = useState({ page: 1, per_page: 15, total: 0, pages: 0 });
+  const [whitelistedIPs, setWhitelistedIPs] = useState<WhitelistIP[]>([]);
+  const [pagination, setPagination] = useState<PaginationType>({ page: 1, per_page: 15, total: 0, pages: 0 });
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -31,11 +32,7 @@ export default function WhitelistPage() {
   const [newDescription, setNewDescription] = useState('');
   const { toast } = useToast();
 
-  useEffect(() => {
-    loadWhitelistedIPs();
-  }, [pagination.page]);
-
-  const loadWhitelistedIPs = async () => {
+  const loadWhitelistedIPs = useCallback(async () => {
     try {
       setLoading(true);
       const data = await whitelistAPI.getWhitelist({
@@ -55,7 +52,11 @@ export default function WhitelistPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.page, pagination.per_page, searchTerm, toast]);
+
+  useEffect(() => {
+    loadWhitelistedIPs();
+  }, [loadWhitelistedIPs]);
 
   const handleAddIP = async () => {
     if (!newIP || !newDescription) {

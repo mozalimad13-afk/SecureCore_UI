@@ -28,7 +28,6 @@ import AdminUsers from "./pages/admin/AdminUsers";
 import AdminSystemHealth from "./pages/admin/AdminSystemHealth";
 import AdminNotifications from "./pages/admin/AdminNotifications";
 import AdminLogs from "./pages/admin/AdminLogs";
-import AdminSettings from "./pages/admin/AdminSettings";
 
 const queryClient = new QueryClient();
 
@@ -47,7 +46,7 @@ const App = () => (
                   <Route path="/login" element={<Login />} />
                   <Route path="/register" element={<Register />} />
                   <Route path="/contact" element={<Contact />} />
-                  
+
                   {/* User Dashboard */}
                   <Route path="/dashboard" element={<DashboardLayout />}>
                     <Route index element={<DashboardHome />} />
@@ -60,7 +59,7 @@ const App = () => (
                     <Route path="settings" element={<SettingsPage />} />
                     <Route path="downloads" element={<DownloadsPage />} />
                   </Route>
-                  
+
                   {/* Admin Dashboard */}
                   <Route path="/admin" element={<AdminLayout />}>
                     <Route index element={<AdminHome />} />
@@ -68,9 +67,8 @@ const App = () => (
                     <Route path="system" element={<AdminSystemHealth />} />
                     <Route path="notifications" element={<AdminNotifications />} />
                     <Route path="logs" element={<AdminLogs />} />
-                    <Route path="settings" element={<AdminSettings />} />
                   </Route>
-                  
+
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </NotificationPopupProvider>

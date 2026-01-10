@@ -1,8 +1,17 @@
-/**
- * API Service Layer
- * Handles all communication with Flask backend
- * Uses HttpOnly cookies for JWT + CSRF tokens for security
- */
+import {
+    User,
+    Notification,
+    Alert,
+    Pagination,
+    BlocklistIP,
+    WhitelistIP,
+    APIToken,
+    SystemHealth,
+    AdminStats,
+    Subscription,
+    PaymentMethod,
+    AdminBroadcast
+} from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const API_PREFIX = '/api/v1';
@@ -50,6 +59,12 @@ async function apiRequest<T>(
         credentials: 'include',  // Include HttpOnly cookies
     });
 
+    // For state-changing requests, the token is consumed. 
+    // Clear it so it must be re-fetched (or provided in next response)
+    if (options.method && !['GET', 'HEAD', 'OPTIONS'].includes(options.method)) {
+        csrfToken = null;
+    }
+
     if (!response.ok) {
         // On 401, clear CSRF token (user likely logged out)
         if (response.status === 401) {
@@ -59,9 +74,13 @@ async function apiRequest<T>(
         throw new Error(error.error || `HTTP ${response.status}`);
     }
 
-    // If response includes new CSRF token, save it
+    // If response includes new CSRF token (in body or header), save it
     const data = await response.json();
-    if (data.csrf_token) {
+    const tokenFromHeader = response.headers.get('X-CSRF-Token');
+
+    if (tokenFromHeader) {
+        csrfToken = tokenFromHeader;
+    } else if (data.csrf_token) {
         csrfToken = data.csrf_token;
     }
 
@@ -71,7 +90,7 @@ async function apiRequest<T>(
 // Auth API
 export const authAPI = {
     login: async (email: string, password: string) => {
-        const data = await apiRequest<{ csrf_token: string; user: any }>('/auth/login', {
+        const data = await apiRequest<{ csrf_token: string; user: User }>('/auth/login', {
             method: 'POST',
             body: JSON.stringify({ email, password }),
         });
@@ -80,15 +99,15 @@ export const authAPI = {
         return data;
     },
 
-    register: async (email: string, password: string, name: string, extras?: any) => {
-        const payload: any = { email, password, name };
+    register: async (email: string, password: string, name: string, extras?: Record<string, unknown>) => {
+        const payload: Record<string, unknown> = { email, password, name };
 
         // Add optional payment data and other extras
         if (extras) {
             Object.assign(payload, extras);
         }
 
-        return apiRequest('/auth/register', {
+        return apiRequest<{ message: string; user: User }>('/auth/register', {
             method: 'POST',
             body: JSON.stringify(payload),
         });
@@ -100,23 +119,23 @@ export const authAPI = {
     },
 
     getCurrentUser: async () => {
-        return apiRequest<{ email: string; name: string; role: string }>('/auth/me');
+        return apiRequest<{ user: User }>('/auth/me');
     },
 };
 
 // Alerts API
 export const alertsAPI = {
     getAlerts: async (params?: { page?: number; per_page?: number; severity?: string }) => {
-        const query = new URLSearchParams(params as any).toString();
-        return apiRequest<{ alerts: any[]; pagination: any }>(`/alerts?${query}`);
+        const query = new URLSearchParams(params as Record<string, string>).toString();
+        return apiRequest<{ alerts: Alert[]; pagination: Pagination }>(`/alerts?${query}`);
     },
 
     getStats: async () => {
-        return apiRequest<any>('/alerts/stats');
+        return apiRequest<Record<string, number>>('/alerts/stats');
     },
 
     getRecent: async (limit = 5) => {
-        return apiRequest<{ recent_alerts: any[] }>(`/alerts/recent?limit=${limit}`);
+        return apiRequest<{ recent_alerts: Alert[] }>(`/alerts/recent?limit=${limit}`);
     },
 
     acknowledge: async (id: number) => {
@@ -127,8 +146,8 @@ export const alertsAPI = {
 // Blocklist API
 export const blocklistAPI = {
     getBlocklist: async (params?: { page?: number; per_page?: number; search?: string }) => {
-        const query = new URLSearchParams(params as any).toString();
-        return apiRequest<{ blocked_ips: any[]; pagination: any }>(`/blocklist?${query}`);
+        const query = new URLSearchParams(params as Record<string, string>).toString();
+        return apiRequest<{ blocked_ips: BlocklistIP[]; pagination: Pagination }>(`/blocklist?${query}`);
     },
 
     blockIP: async (ip: string, reason: string) => {
@@ -146,8 +165,8 @@ export const blocklistAPI = {
 // Whitelist API
 export const whitelistAPI = {
     getWhitelist: async (params?: { page?: number; per_page?: number; search?: string }) => {
-        const query = new URLSearchParams(params as any).toString();
-        return apiRequest<{ whitelisted_ips: any[]; pagination: any }>(`/whitelist?${query}`);
+        const query = new URLSearchParams(params as Record<string, string>).toString();
+        return apiRequest<{ whitelisted_ips: WhitelistIP[]; pagination: Pagination }>(`/whitelist?${query}`);
     },
 
     addIP: async (ip: string, description: string) => {
@@ -165,7 +184,7 @@ export const whitelistAPI = {
 // Notifications API
 export const notificationsAPI = {
     getNotifications: async () => {
-        return apiRequest<{ notifications: any[] }>('/notifications');
+        return apiRequest<{ notifications: Notification[] }>('/notifications');
     },
 
     markAsRead: async (id: string) => {
@@ -180,10 +199,10 @@ export const notificationsAPI = {
 // Settings API
 export const settingsAPI = {
     getSettings: async () => {
-        return apiRequest<any>('/settings');
+        return apiRequest<Record<string, unknown>>('/settings');
     },
 
-    updateSettings: async (settings: any) => {
+    updateSettings: async (settings: Record<string, unknown>) => {
         return apiRequest('/settings', {
             method: 'PUT',
             body: JSON.stringify(settings),
@@ -198,11 +217,11 @@ export const settingsAPI = {
 // API Tokens
 export const tokensAPI = {
     getTokens: async () => {
-        return apiRequest<{ tokens: any[] }>('/tokens');
+        return apiRequest<{ tokens: APIToken[] }>('/tokens');
     },
 
     generateToken: async (name: string) => {
-        return apiRequest<{ token: string; api_token: any }>('/tokens/generate', {
+        return apiRequest<{ token: string; api_token: APIToken }>('/tokens/generate', {
             method: 'POST',
             body: JSON.stringify({ name }),
         });
@@ -216,7 +235,7 @@ export const tokensAPI = {
 // Reports API
 export const reportsAPI = {
     preview: async (startDate: string, endDate: string) => {
-        return apiRequest<{ preview: any }>('/reports/preview', {
+        return apiRequest<{ preview: Record<string, unknown> }>('/reports/preview', {
             method: 'POST',
             body: JSON.stringify({ start_date: startDate, end_date: endDate }),
         });
@@ -256,8 +275,8 @@ export const reportsAPI = {
 // Admin API
 export const adminAPI = {
     getUsers: async (params?: { page?: number; per_page?: number }) => {
-        const query = new URLSearchParams(params as any).toString();
-        return apiRequest<{ users: any[]; pagination: any }>(`/admin/users?${query}`);
+        const query = new URLSearchParams(params as Record<string, string>).toString();
+        return apiRequest<{ users: User[]; pagination: Pagination }>(`/admin/users?${query}`);
     },
 
     suspendUser: async (userId: number) => {
@@ -269,25 +288,36 @@ export const adminAPI = {
     },
 
     getStats: async () => {
-        return apiRequest<any>('/admin/stats');
+        return apiRequest<AdminStats>('/admin/stats');
     },
 
     getHealth: async () => {
-        return apiRequest<any>('/admin/health');
+        return apiRequest<SystemHealth>('/admin/health');
+    },
+
+    sendNotification: async (data: { title: string; message: string; target_type: string; target_ids?: number[] }) => {
+        return apiRequest<{ message: string }>('/admin/notifications/send', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    },
+
+    getNotificationHistory: async () => {
+        return apiRequest<{ history: AdminBroadcast[] }>('/admin/notifications/history');
     },
 };
 
 // Subscription API
 export const subscriptionAPI = {
     getSubscription: async () => {
-        return apiRequest<any>('/subscription');
+        return apiRequest<Subscription>('/subscription');
     },
 };
 
 // Payment Methods API
 export const paymentMethodsAPI = {
     getPaymentMethods: async () => {
-        return apiRequest<{ payment_methods: any[] }>('/payment-methods');
+        return apiRequest<{ payment_methods: PaymentMethod[] }>('/payment-methods');
     },
 
     addPaymentMethod: async (data: {
@@ -300,7 +330,7 @@ export const paymentMethodsAPI = {
         zip_code?: string;
         country?: string;
     }) => {
-        return apiRequest<{ payment_method: any }>('/payment-methods', {
+        return apiRequest<{ payment_method: PaymentMethod }>('/payment-methods', {
             method: 'POST',
             body: JSON.stringify(data),
         });
@@ -318,3 +348,4 @@ export const paymentMethodsAPI = {
         });
     },
 };
+

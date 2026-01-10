@@ -7,11 +7,12 @@ import { Download, FileText, Calendar as CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { reportsAPI } from '@/services/api';
+import { ReportPreview } from '@/types';
 
 export default function ReportsPage() {
   const [startDate, setStartDate] = useState<Date>();
   const [endDate, setEndDate] = useState<Date>();
-  const [preview, setPreview] = useState<any>(null);
+  const [preview, setPreview] = useState<ReportPreview | null>(null);
   const [generating, setGenerating] = useState(false);
   const { toast } = useToast();
 

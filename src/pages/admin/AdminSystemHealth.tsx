@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Activity, Database, Server, Cpu, HardDrive } from 'lucide-react';
 import { adminAPI } from '@/services/api';
+import { SystemHealth } from '@/types';
 
 export default function AdminSystemHealth() {
-  const [health, setHealth] = useState<any>(null);
+  const [health, setHealth] = useState<SystemHealth | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -195,7 +196,7 @@ export default function AdminSystemHealth() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {Object.entries(health.database.table_counts).map(([table, count]: [string, any]) => (
+              {Object.entries(health.database.table_counts as Record<string, number>).map(([table, count]) => (
                 <div key={table} className="p-3 border rounded">
                   <div className="text-sm text-muted-foreground capitalize">{table}</div>
                   <div className="text-2xl font-bold">{count?.toLocaleString()}</div>

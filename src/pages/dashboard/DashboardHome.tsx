@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { alertsAPI, blocklistAPI, whitelistAPI } from '@/services/api';
+import { Alert } from '@/types';
 
 const severityColors: Record<string, string> = {
   'Low': 'bg-green-500',
@@ -35,16 +36,12 @@ export default function DashboardHome() {
     network_health: 98.5,
   });
 
-  const [recentAlerts, setRecentAlerts] = useState<any[]>([]);
-  const [lineChartData, setLineChartData] = useState<any[]>([]);
-  const [pieData, setPieData] = useState<any[]>([]);
+  const [recentAlerts, setRecentAlerts] = useState<Alert[]>([]);
+  const [lineChartData, setLineChartData] = useState<{ name: string; alerts: number; blocked: number }[]>([]);
+  const [pieData, setPieData] = useState<{ name: string; value: number; color: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
-
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -63,7 +60,7 @@ export default function DashboardHome() {
 
       // Process weekly trend for line chart
       if (statsData.weekly_trend) {
-        const chartData = statsData.weekly_trend.map((day: any) => ({
+        const chartData = (statsData.weekly_trend as { date: string; alerts: number; blocked: number }[]).map((day) => ({
           name: new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' }),
           alerts: day.alerts,
           blocked: day.blocked,
@@ -74,10 +71,10 @@ export default function DashboardHome() {
       // Process severity distribution for pie chart
       if (statsData.severity_distribution) {
         const pie = [
-          { name: 'Low', value: statsData.severity_distribution.Low || 0, color: '#22c55e' },
-          { name: 'Medium', value: statsData.severity_distribution.Medium || 0, color: '#f59e0b' },
-          { name: 'High', value: statsData.severity_distribution.High || 0, color: '#ef4444' },
-          { name: 'Critical', value: statsData.severity_distribution.Critical || 0, color: '#7c3aed' },
+          { name: 'Low', value: (statsData.severity_distribution as Record<string, number>).Low || 0, color: '#22c55e' },
+          { name: 'Medium', value: (statsData.severity_distribution as Record<string, number>).Medium || 0, color: '#f59e0b' },
+          { name: 'High', value: (statsData.severity_distribution as Record<string, number>).High || 0, color: '#ef4444' },
+          { name: 'Critical', value: (statsData.severity_distribution as Record<string, number>).Critical || 0, color: '#7c3aed' },
         ];
         setPieData(pie);
       }
@@ -98,7 +95,11 @@ export default function DashboardHome() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
 
   const handleBlockIP = async (ip: string) => {
     try {

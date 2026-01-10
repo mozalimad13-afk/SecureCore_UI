@@ -1,20 +1,7 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { authAPI, notificationsAPI } from '../services/api';
-
-interface User {
-  email: string;
-  name: string;
-  role: 'user' | 'admin';
-}
-
-interface Notification {
-  id: string;
-  title: string;
-  message: string;
-  time: string;
-  read: boolean;
-  type: 'alert' | 'info' | 'warning';
-}
+import { User, Notification } from '../types';
 
 interface AuthContextType {
   user: User | null;
@@ -39,7 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const loadUser = async () => {
       try {
         const userData = await authAPI.getCurrentUser();
-        setUser(userData as User);
+        setUser(userData.user as User);
       } catch (error) {
         console.log('Not authenticated');
       }
@@ -51,7 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const loadNotifications = async () => {
       if (!user) return;
-      
+
       try {
         const data = await notificationsAPI.getNotifications();
         setNotifications(data.notifications || []);
@@ -59,7 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error('Failed to load notifications:', error);
       }
     };
-    
+
     loadNotifications();
     // Poll for new notifications every 30 seconds
     const interval = setInterval(loadNotifications, 30000);
@@ -68,10 +55,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string): Promise<{ success: boolean; role: 'user' | 'admin' }> => {
     try {
-      await authAPI.login(email, password);
-      const userData = await authAPI.getCurrentUser();
-      setUser(userData as User);
-      return { success: true, role: userData.role as 'user' | 'admin' };
+      const userData = await authAPI.login(email, password);
+      setUser(userData.user as User);
+      return { success: true, role: userData.user.role as 'user' | 'admin' };
     } catch (error) {
       console.error('Login failed:', error);
       return { success: false, role: 'user' };

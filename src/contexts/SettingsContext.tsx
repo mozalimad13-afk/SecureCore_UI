@@ -1,5 +1,7 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { settingsAPI, subscriptionAPI } from '../services/api';
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { settingsAPI, subscriptionAPI, paymentMethodsAPI } from '../services/api';
+import { PaymentMethod as APIPaymentMethod, PaymentMethodForm } from '../types';
 import { useAuth } from './AuthContext';
 
 interface Settings {
@@ -37,7 +39,7 @@ interface SettingsContextType {
   settings: Settings;
   loading: boolean;
   updateSettings: (updates: Partial<Settings>) => Promise<void>;
-  addPaymentMethod: (method: Omit<PaymentMethod, 'id'>) => void;
+  addPaymentMethod: (method: PaymentMethodForm) => void;
   removePaymentMethod: (id: string) => void;
   setDefaultPaymentMethod: (id: string) => void;
   runBackupNow: () => Promise<void>;
@@ -65,40 +67,48 @@ const defaultSettings: Settings = {
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const auth = useAuth();
+  const { isAuthenticated, user } = auth;
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [loading, setLoading] = useState(false);
 
-  // Only load settings when user is authenticated
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadSettings();
-    }
-  }, [isAuthenticated]);
-
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     try {
       setLoading(true);
-      const [settingsData, subscriptionData] = await Promise.all([
-        settingsAPI.getSettings(),
-        subscriptionAPI.getSubscription().catch(() => null),
+      // Get the role from auth to check if we should call user-only endpoints
+      const { user } = auth; // We need the user object
+      const isUser = user?.role === 'user';
+
+      const [settingsData, subscriptionData, paymentMethodsData] = await Promise.all([
+        isUser ? settingsAPI.getSettings() : Promise.resolve({ settings: defaultSettings }),
+        isUser ? subscriptionAPI.getSubscription().catch(() => null) : Promise.resolve(null),
+        isUser ? paymentMethodsAPI.getPaymentMethods().catch(() => ({ payment_methods: [] })) : Promise.resolve({ payment_methods: [] }),
       ]);
 
+      // Handle the case where settingsData might be wrapped in a 'settings' property or be the object itself
+      const rawSettings = (settingsData as { settings?: Record<string, unknown> }).settings || (settingsData as Record<string, unknown>);
+
       const merged: Settings = {
-        emailNotifications: settingsData.email_notifications ?? defaultSettings.emailNotifications,
-        smsNotifications: settingsData.sms_notifications ?? defaultSettings.smsNotifications,
-        webhookNotifications: settingsData.webhook_notifications ?? defaultSettings.webhookNotifications,
-        webhookUrl: settingsData.webhook_url || '',
-        dailyDigest: settingsData.daily_digest ?? defaultSettings.dailyDigest,
-        weeklyReport: settingsData.weekly_report ?? defaultSettings.weeklyReport,
-        digestTime: settingsData.digest_time || defaultSettings.digestTime,
-        backupFrequency: settingsData.backup_frequency || defaultSettings.backupFrequency,
-        lastBackup: settingsData.last_backup || '',
-        nextBackup: settingsData.next_backup || '',
-        plan: subscriptionData?.plan_name || 'Free',
+        emailNotifications: (rawSettings.email_notifications as boolean) ?? defaultSettings.emailNotifications,
+        smsNotifications: (rawSettings.sms_notifications as boolean) ?? defaultSettings.smsNotifications,
+        webhookNotifications: (rawSettings.webhook_notifications as boolean) ?? defaultSettings.webhookNotifications,
+        webhookUrl: (rawSettings.webhook_url as string) || '',
+        dailyDigest: (rawSettings.daily_digest as boolean) ?? defaultSettings.dailyDigest,
+        weeklyReport: (rawSettings.weekly_report as boolean) ?? defaultSettings.weeklyReport,
+        digestTime: (rawSettings.digest_time as string) || defaultSettings.digestTime,
+        backupFrequency: (rawSettings.backup_frequency as 'hourly' | 'daily' | 'weekly' | 'monthly') || defaultSettings.backupFrequency,
+        lastBackup: (rawSettings.last_backup as string) || '',
+        nextBackup: (rawSettings.next_backup as string) || '',
+        plan: (subscriptionData?.plan_name as string) || 'Free',
         planPrice: subscriptionData?.plan_price ? `$${subscriptionData.plan_price}/month` : '$0/month',
-        nextBillingDate: subscriptionData?.next_billing_date || '',
-        paymentMethods: [],
+        nextBillingDate: (subscriptionData?.next_billing_date as string) || '',
+        paymentMethods: paymentMethodsData.payment_methods.map((pm: APIPaymentMethod) => ({
+          id: pm.id.toString(),
+          type: pm.card_brand || 'Card',
+          last4: pm.card_last4,
+          expiry: `${pm.expiry_month}/${pm.expiry_year}`,
+          isDefault: pm.is_default
+        })),
       };
 
       setSettings(merged);
@@ -107,11 +117,18 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [auth]);
+
+  // Only load settings when user is authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadSettings();
+    }
+  }, [isAuthenticated, loadSettings]);
 
   const updateSettings = async (updates: Partial<Settings>) => {
     try {
-      const apiUpdates: any = {};
+      const apiUpdates: Record<string, unknown> = {};
 
       if ('emailNotifications' in updates) apiUpdates.email_notifications = updates.emailNotifications;
       if ('smsNotifications' in updates) apiUpdates.sms_notifications = updates.smsNotifications;
@@ -140,29 +157,65 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const addPaymentMethod = (method: Omit<PaymentMethod, 'id'>) => {
-    const newMethod = { ...method, id: Date.now().toString() };
-    setSettings(prev => ({
-      ...prev,
-      paymentMethods: [...prev.paymentMethods, newMethod],
-    }));
+  const addPaymentMethod = async (method: PaymentMethodForm) => {
+    try {
+      const addData = {
+        card_number: method.cardNumber || '0000',
+        card_holder_name: method.cardName || 'Unknown',
+        expiry_month: method.expiryMonth || '01',
+        expiry_year: method.expiryYear || '25',
+        billing_address: method.billingAddress,
+        city: method.city,
+        zip_code: method.zipCode
+      };
+
+      const data = await paymentMethodsAPI.addPaymentMethod(addData);
+
+      const newMethod = data.payment_method;
+
+      setSettings(prev => ({
+        ...prev,
+        paymentMethods: [...prev.paymentMethods, {
+          id: newMethod.id.toString(),
+          type: newMethod.card_brand || 'Card',
+          last4: newMethod.card_last4,
+          expiry: `${newMethod.expiry_month}/${newMethod.expiry_year}`,
+          isDefault: newMethod.is_default
+        }],
+      }));
+    } catch (error) {
+      console.error('Failed to add payment method:', error);
+      throw error;
+    }
   };
 
-  const removePaymentMethod = (id: string) => {
-    setSettings(prev => ({
-      ...prev,
-      paymentMethods: prev.paymentMethods.filter(m => m.id !== id),
-    }));
+  const removePaymentMethod = async (id: string) => {
+    try {
+      await paymentMethodsAPI.deletePaymentMethod(parseInt(id));
+      setSettings(prev => ({
+        ...prev,
+        paymentMethods: prev.paymentMethods.filter(m => m.id !== id),
+      }));
+    } catch (error) {
+      console.error('Failed to remove payment method:', error);
+      throw error;
+    }
   };
 
-  const setDefaultPaymentMethod = (id: string) => {
-    setSettings(prev => ({
-      ...prev,
-      paymentMethods: prev.paymentMethods.map(m => ({
-        ...m,
-        isDefault: m.id === id,
-      })),
-    }));
+  const setDefaultPaymentMethod = async (id: string) => {
+    try {
+      await paymentMethodsAPI.setDefaultPaymentMethod(parseInt(id));
+      setSettings(prev => ({
+        ...prev,
+        paymentMethods: prev.paymentMethods.map(m => ({
+          ...m,
+          isDefault: m.id === id,
+        })),
+      }));
+    } catch (error) {
+      console.error('Failed to set default payment method:', error);
+      throw error;
+    }
   };
 
   const cancelSubscription = () => {

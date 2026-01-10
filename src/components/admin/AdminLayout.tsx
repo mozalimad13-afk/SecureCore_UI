@@ -72,7 +72,7 @@ export function AdminLayout() {
           <AdminSidebar onNavigate={() => setSidebarOpen(false)} />
         </SheetContent>
       </Sheet>
-      
+
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="h-16 border-b border-border flex items-center justify-between px-4 md:px-6 flex-shrink-0">
           <div className="flex items-center gap-2">
@@ -88,11 +88,11 @@ export function AdminLayout() {
             <Shield className="w-5 h-5 text-primary hidden sm:block" />
             <h1 className="text-lg font-semibold hidden sm:block">Admin Dashboard</h1>
           </div>
-          
+
           <div className="flex items-center gap-2 md:gap-4">
             <ThemeToggle />
             <NotificationDropdown />
-            
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center gap-2">
@@ -107,10 +107,6 @@ export function AdminLayout() {
                   <LayoutDashboard className="w-4 h-4 mr-2" />
                   Dashboard
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate('/admin/settings')}>
-                  <Settings className="w-4 h-4 mr-2" />
-                  Settings
-                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout} className="text-destructive">
                   <LogOut className="w-4 h-4 mr-2" />
@@ -120,7 +116,7 @@ export function AdminLayout() {
             </DropdownMenu>
           </div>
         </header>
-        
+
         <main className="flex-1 p-4 md:p-6 overflow-auto">
           <Outlet />
         </main>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,10 +20,11 @@ import {
 } from '@/components/ui/pagination';
 import { useToast } from '@/hooks/use-toast';
 import { blocklistAPI } from '@/services/api';
+import { BlocklistIP, Pagination as PaginationType } from '@/types';
 
 export default function BlocklistPage() {
-  const [blockedIPs, setBlockedIPs] = useState<any[]>([]);
-  const [pagination, setPagination] = useState({ page: 1, per_page: 15, total: 0, pages: 0 });
+  const [blockedIPs, setBlockedIPs] = useState<BlocklistIP[]>([]);
+  const [pagination, setPagination] = useState<PaginationType>({ page: 1, per_page: 15, total: 0, pages: 0 });
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -31,11 +32,7 @@ export default function BlocklistPage() {
   const [newReason, setNewReason] = useState('');
   const { toast } = useToast();
 
-  useEffect(() => {
-    loadBlockedIPs();
-  }, [pagination.page]);
-
-  const loadBlockedIPs = async () => {
+  const loadBlockedIPs = useCallback(async () => {
     try {
       setLoading(true);
       const data = await blocklistAPI.getBlocklist({
@@ -55,7 +52,11 @@ export default function BlocklistPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.page, pagination.per_page, searchTerm, toast]);
+
+  useEffect(() => {
+    loadBlockedIPs();
+  }, [loadBlockedIPs]);
 
   const handleAddIP = async () => {
     if (!newIP || !newReason) {

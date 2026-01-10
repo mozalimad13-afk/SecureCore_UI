@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,9 +12,10 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { tokensAPI } from '@/services/api';
+import { APIToken } from '@/types';
 
 export default function TokenPage() {
-  const [tokens, setTokens] = useState<any[]>([]);
+  const [tokens, setTokens] = useState<APIToken[]>([]);
   const [showToken, setShowToken] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -22,11 +23,7 @@ export default function TokenPage() {
   const [generatedToken, setGeneratedToken] = useState('');
   const { toast } = useToast();
 
-  useEffect(() => {
-    loadTokens();
-  }, []);
-
-  const loadTokens = async () => {
+  const loadTokens = useCallback(async () => {
     try {
       setLoading(true);
       const data = await tokensAPI.getTokens();
@@ -41,7 +38,11 @@ export default function TokenPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    loadTokens();
+  }, [loadTokens]);
 
   const handleGenerateToken = async () => {
     if (!newTokenName) {

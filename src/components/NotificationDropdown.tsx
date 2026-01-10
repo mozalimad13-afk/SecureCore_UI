@@ -65,7 +65,10 @@ export function NotificationDropdown() {
                     'flex items-start gap-3 p-3 cursor-pointer',
                     !notification.read && 'bg-primary/5'
                   )}
-                  onClick={() => markAsRead(notification.id)}
+                  onClick={() => {
+                    markAsRead(notification.id);
+                    if (notification.link) navigate(notification.link);
+                  }}
                 >
                   <Icon className={cn('w-5 h-5 mt-0.5 flex-shrink-0', typeColors[notification.type])} />
                   <div className="flex-1 min-w-0">
@@ -86,9 +89,9 @@ export function NotificationDropdown() {
         {notifications.length > 0 && (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuItem 
+            <DropdownMenuItem
               className="text-center text-sm text-primary cursor-pointer justify-center"
-              onClick={() => navigate('/dashboard/notifications')}
+              onClick={() => navigate(user?.role === 'admin' ? '/admin/notifications?tab=system' : '/dashboard/notifications')}
             >
               View all notifications
             </DropdownMenuItem>
