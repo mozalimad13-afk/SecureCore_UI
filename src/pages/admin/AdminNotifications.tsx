@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Bell, Send, Users, User, Clock, CheckCircle, Search, X, AlertTriangle, Info, AlertCircle, Activity, UserPlus, Check, Loader2 } from 'lucide-react';
+import { Bell, Send, Users, User, Clock, CheckCircle, Search, X, AlertTriangle, Info, AlertCircle, Activity, UserPlus, Check, Loader2, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
@@ -353,6 +353,18 @@ export default function AdminNotifications() {
                 <Button variant="outline" onClick={handleMarkAllAsRead}>
                   <Check className="w-4 h-4 mr-2" />
                   Mark all read
+                </Button>
+              )}
+              {systemNotifications.length > 0 && (
+                <Button
+                  variant="outline"
+                  className="text-red-500 border-red-500/50 hover:bg-red-500/10 dark:text-red-400 dark:border-red-400/50 dark:hover:bg-red-400/10 transition-colors"
+                  onClick={() => {
+                    clearAll().then(() => toast({ title: 'Notifications cleared' }))
+                  }}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Clear all
                 </Button>
               )}
             </div>

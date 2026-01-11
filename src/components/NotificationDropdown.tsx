@@ -24,7 +24,7 @@ const typeColors = {
 };
 
 export function NotificationDropdown() {
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useAuth();
+  const { notifications, unreadCount, markAsRead, markAllAsRead, user } = useAuth();
   const navigate = useNavigate();
 
   return (
@@ -67,7 +67,6 @@ export function NotificationDropdown() {
                   )}
                   onClick={() => {
                     markAsRead(notification.id);
-                    if (notification.link) navigate(notification.link);
                   }}
                 >
                   <Icon className={cn('w-5 h-5 mt-0.5 flex-shrink-0', typeColors[notification.type])} />

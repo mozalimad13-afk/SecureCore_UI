@@ -38,13 +38,15 @@ interface PaymentMethod {
 interface SettingsContextType {
   settings: Settings;
   loading: boolean;
+  subscriptionStatus: 'active' | 'suspended' | 'trial' | 'none';
+  isSuspended: boolean;
   updateSettings: (updates: Partial<Settings>) => Promise<void>;
-  addPaymentMethod: (method: PaymentMethodForm) => void;
-  removePaymentMethod: (id: string) => void;
-  setDefaultPaymentMethod: (id: string) => void;
+  addPaymentMethod: (method: PaymentMethodForm) => Promise<void>;
+  removePaymentMethod: (id: string) => Promise<void>;
+  setDefaultPaymentMethod: (id: string) => Promise<void>;
   runBackupNow: () => Promise<void>;
-  cancelSubscription: () => void;
-  resubscribe: () => void;
+  cancelSubscription: () => Promise<void>;
+  resubscribe: (plan: string, cardDetails: { cardNumber: string; cardName: string; expiry: string; cvc: string }) => Promise<void>;
 }
 
 const defaultSettings: Settings = {
@@ -55,7 +57,7 @@ const defaultSettings: Settings = {
   dailyDigest: false,
   weeklyReport: false,
   digestTime: '09:00',
-  backupFrequency: 'daily',
+  backupFrequency: 'monthly',
   lastBackup: '',
   nextBackup: '',
   plan: 'Free',
@@ -99,9 +101,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         backupFrequency: (rawSettings.backup_frequency as 'hourly' | 'daily' | 'weekly' | 'monthly') || defaultSettings.backupFrequency,
         lastBackup: (rawSettings.last_backup as string) || '',
         nextBackup: (rawSettings.next_backup as string) || '',
-        plan: (subscriptionData?.plan_name as string) || 'Free',
-        planPrice: subscriptionData?.plan_price ? `$${subscriptionData.plan_price}/month` : '$0/month',
-        nextBillingDate: (subscriptionData?.next_billing_date as string) || '',
+        plan: (subscriptionData?.subscription?.plan_name as string) || 'Free',
+        planPrice: subscriptionData?.subscription?.plan_price ? `$${subscriptionData.subscription.plan_price}/month` : '$0/month',
+        nextBillingDate: (subscriptionData?.subscription?.next_billing_date as string) || '',
         paymentMethods: paymentMethodsData.payment_methods.map((pm: APIPaymentMethod) => ({
           id: pm.id.toString(),
           type: pm.card_brand || 'Card',
@@ -218,18 +220,47 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const cancelSubscription = () => {
-    setSettings(prev => ({ ...prev, plan: 'Cancelled' }));
+  const cancelSubscription = async () => {
+    try {
+      const data = await subscriptionAPI.cancelSubscription();
+      if (data.subscription) {
+        setSettings(prev => ({
+          ...prev,
+          plan: data.subscription.plan_name,
+          planPrice: data.subscription.plan_price ? `$${data.subscription.plan_price}/month` : '$0/month'
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to cancel subscription:', error);
+      throw error;
+    }
   };
 
-  const resubscribe = () => {
-    setSettings(prev => ({ ...prev, plan: 'Small Companies' }));
+  const resubscribe = async (plan: string, cardDetails: { cardNumber: string; cardName: string; expiry: string; cvc: string }) => {
+    try {
+      const data = await subscriptionAPI.resubscribe(plan, cardDetails);
+      if (data.subscription) {
+        setSettings(prev => ({
+          ...prev,
+          plan: data.subscription.plan_name,
+          planPrice: data.subscription.plan_price ? `$${data.subscription.plan_price}/month` : (plan === 'Entropy' ? '$499/month' : '$99/month')
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to resubscribe:', error);
+      throw error;
+    }
   };
+
+  const subscriptionStatus = settings.plan === 'Cancelled' ? 'suspended' : (settings.plan === 'Free' ? 'trial' : 'active');
+  const isSuspended = subscriptionStatus === 'suspended';
 
   return (
     <SettingsContext.Provider value={{
       settings,
       loading,
+      subscriptionStatus,
+      isSuspended,
       updateSettings,
       addPaymentMethod,
       removePaymentMethod,

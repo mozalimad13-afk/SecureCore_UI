@@ -10,7 +10,9 @@ import {
     AdminStats,
     Subscription,
     PaymentMethod,
-    AdminBroadcast
+    AdminBroadcast,
+    AlertStats,
+    AlertQueryParams
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -121,20 +123,28 @@ export const authAPI = {
     getCurrentUser: async () => {
         return apiRequest<{ user: User }>('/auth/me');
     },
+
+    updateProfile: async (data: { name?: string; email?: string; currentPassword?: string; newPassword?: string }) => {
+        return apiRequest<{ message: string; user: User }>('/auth/me', {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    },
 };
 
 // Alerts API
 export const alertsAPI = {
-    getAlerts: async (params?: { page?: number; per_page?: number; severity?: string }) => {
-        const query = new URLSearchParams(params as Record<string, string>).toString();
+    getAlerts: async (params: AlertQueryParams = {}) => {
+        const query = new URLSearchParams(params as unknown as Record<string, string>).toString();
         return apiRequest<{ alerts: Alert[]; pagination: Pagination }>(`/alerts?${query}`);
     },
 
-    getStats: async () => {
-        return apiRequest<Record<string, number>>('/alerts/stats');
+    getStats: async (timeRange?: string) => {
+        const query = timeRange ? `?time_range=${timeRange}` : '';
+        return apiRequest<AlertStats>(`/alerts/stats${query}`);
     },
 
-    getRecent: async (limit = 5) => {
+    getRecentAlerts: async (limit = 5) => {
         return apiRequest<{ recent_alerts: Alert[] }>(`/alerts/recent?limit=${limit}`);
     },
 
@@ -160,6 +170,13 @@ export const blocklistAPI = {
     unblockIP: async (id: number) => {
         return apiRequest(`/blocklist/${id}`, { method: 'DELETE' });
     },
+
+    updateBlockedIP: async (id: number, reason: string) => {
+        return apiRequest(`/blocklist/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ reason }),
+        });
+    },
 };
 
 // Whitelist API
@@ -179,6 +196,13 @@ export const whitelistAPI = {
     removeIP: async (id: number) => {
         return apiRequest(`/whitelist/${id}`, { method: 'DELETE' });
     },
+
+    updateWhitelistedIP: async (id: number, description: string) => {
+        return apiRequest(`/whitelist/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ description }),
+        });
+    },
 };
 
 // Notifications API
@@ -193,6 +217,10 @@ export const notificationsAPI = {
 
     markAllAsRead: async () => {
         return apiRequest('/notifications/read-all', { method: 'PUT' });
+    },
+
+    clearAllNotifications: async () => {
+        return apiRequest('/notifications', { method: 'DELETE' });
     },
 };
 
@@ -221,7 +249,7 @@ export const tokensAPI = {
     },
 
     generateToken: async (name: string) => {
-        return apiRequest<{ token: string; api_token: APIToken }>('/tokens/generate', {
+        return apiRequest<{ token: string; token_info: APIToken }>('/tokens/generate', {
             method: 'POST',
             body: JSON.stringify({ name }),
         });
@@ -229,6 +257,12 @@ export const tokensAPI = {
 
     revokeToken: async (id: number) => {
         return apiRequest(`/tokens/${id}`, { method: 'DELETE' });
+    },
+
+    regenerateToken: async (id: number) => {
+        return apiRequest<{ token: string; token_info: APIToken }>(`/tokens/regenerate/${id}`, {
+            method: 'POST'
+        });
     },
 };
 
@@ -265,10 +299,63 @@ export const reportsAPI = {
         const downloadUrl = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = downloadUrl;
-        a.download = `SecureCore_Report_${startDate}_${endDate}.pdf`;
+        a.download = `report_${new Date().toISOString().split('T')[0]}.pdf`;
         document.body.appendChild(a);
         a.click();
-        a.remove();
+        window.URL.revokeObjectURL(downloadUrl);
+        document.body.removeChild(a);
+    },
+
+    list: async () => {
+        return apiRequest<{ reports: any[] }>('/reports/list');
+    },
+
+    upload: async (file: File) => {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        // Ensure we have CSRF token
+        if (!csrfToken) {
+            await fetchCSRFToken();
+        }
+
+        const response = await fetch(`${API_BASE_URL}${API_PREFIX}/reports/upload`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'X-CSRF-Token': csrfToken || '',
+            },
+            body: formData,
+            credentials: 'include',
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to upload report');
+        }
+
+        return response.json();
+    },
+
+    download: (filename: string) => {
+        window.open(`${API_BASE_URL}${API_PREFIX}/reports/download/${filename}`, '_blank');
+    },
+};
+
+// Downloads API
+export const downloadsAPI = {
+    getMetadata: async () => {
+        return apiRequest<{
+            platforms: Array<{
+                name: string;
+                icon: string;
+                version: string;
+                size: string;
+                requirements: string;
+                downloadUrl: string;
+                features: string[];
+            }>
+        }>('/downloads/metadata');
     },
 };
 
@@ -310,7 +397,18 @@ export const adminAPI = {
 // Subscription API
 export const subscriptionAPI = {
     getSubscription: async () => {
-        return apiRequest<Subscription>('/subscription');
+        return apiRequest<{ subscription: Subscription | null }>('/subscription');
+    },
+
+    cancelSubscription: async () => {
+        return apiRequest<{ subscription: Subscription }>('/subscription/cancel', { method: 'POST' });
+    },
+
+    resubscribe: async (plan: string, cardDetails?: { cardNumber: string; cardName: string; expiry: string; cvc: string }) => {
+        return apiRequest<{ subscription: Subscription }>('/subscription/resubscribe', {
+            method: 'POST',
+            body: JSON.stringify({ plan, ...cardDetails }),
+        });
     },
 };
 
@@ -348,4 +446,3 @@ export const paymentMethodsAPI = {
         });
     },
 };
-

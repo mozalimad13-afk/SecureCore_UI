@@ -5,27 +5,26 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from '@/components/ui/select';
-import { 
-  Settings as SettingsIcon, 
-  Bell, 
-  Clock, 
-  Database, 
-  CreditCard, 
+import {
+  Settings as SettingsIcon,
+  Bell,
+  Clock,
+  Database,
+  CreditCard,
   Trash2,
-  Plus,
-  Moon,
-  Sun
+  Plus
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSettings } from '@/contexts/SettingsContext';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   Dialog,
   DialogContent,
@@ -49,18 +48,19 @@ import {
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
-  const { 
-    settings, 
-    updateSettings, 
-    addPaymentMethod, 
-    removePaymentMethod, 
+  const {
+    settings,
+    updateSettings,
+    addPaymentMethod,
+    removePaymentMethod,
     setDefaultPaymentMethod,
     runBackupNow,
     cancelSubscription,
     resubscribe
   } = useSettings();
+  const { user, updateProfile: updateAuthProfile } = useAuth();
   const { toast } = useToast();
-  
+
   // Local state for pending changes (before saving)
   const [pendingTheme, setPendingTheme] = useState(theme);
   const [pendingNotifications, setPendingNotifications] = useState({
@@ -77,11 +77,24 @@ export default function SettingsPage() {
   const [pendingBackup, setPendingBackup] = useState({
     backupFrequency: settings.backupFrequency,
   });
-  
-  const [newCard, setNewCard] = useState({ last4: '', expiry: '' });
+  const [pendingProfile, setPendingProfile] = useState({
+    name: user?.name || '',
+    email: user?.email || '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+
+  const [newCard, setNewCard] = useState({
+    cardNumber: '',
+    cardName: '',
+    expiryMonth: '',
+    expiryYear: '',
+    cvc: '',
+  });
   const [isAddCardOpen, setIsAddCardOpen] = useState(false);
   const [isSubscribeOpen, setIsSubscribeOpen] = useState(false);
-  const [subscribeCard, setSubscribeCard] = useState({ cardNumber: '', expiry: '', cvc: '' });
+  const [selectedPlan, setSelectedPlan] = useState<'Small Companies' | 'Entropy'>('Small Companies');
+  const [subscribeCard, setSubscribeCard] = useState({ cardNumber: '', cardName: '', expiry: '', cvc: '' });
 
   // Sync pending state when settings change
   useEffect(() => {
@@ -103,11 +116,34 @@ export default function SettingsPage() {
     setPendingBackup({
       backupFrequency: settings.backupFrequency,
     });
-  }, [settings]);
+    setPendingProfile({
+      name: user?.name || '',
+      email: user?.email || '',
+      newPassword: '',
+      confirmPassword: '',
+    });
+  }, [settings, user]);
 
-  const handleSavePreferences = () => {
-    setTheme(pendingTheme);
-    toast({ title: 'Settings saved', description: 'Your theme preferences have been updated.' });
+  const handleSaveProfile = async () => {
+    if (pendingProfile.newPassword && pendingProfile.newPassword !== pendingProfile.confirmPassword) {
+      toast({ title: 'Error', description: 'Passwords do not match.', variant: 'destructive' });
+      return;
+    }
+
+    try {
+      await updateAuthProfile({
+        name: pendingProfile.name,
+        email: pendingProfile.email,
+        newPassword: pendingProfile.newPassword || undefined,
+      });
+      setTheme(pendingTheme); // Theme is still handled here even if not visible in Profile? Wait, user said "delete theme part from profile", but where else will it be?
+      toast({ title: 'Profile saved', description: 'Your personal information has been updated.' });
+
+      // Clear password fields after success
+      setPendingProfile(prev => ({ ...prev, newPassword: '', confirmPassword: '' }));
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to update profile.', variant: 'destructive' });
+    }
   };
 
   const handleSaveNotifications = () => {
@@ -131,11 +167,13 @@ export default function SettingsPage() {
   };
 
   const handleAddPaymentMethod = () => {
-    if (newCard.last4.length === 4 && newCard.expiry) {
-      addPaymentMethod({ last4: newCard.last4, expiry: newCard.expiry, isDefault: false });
-      setNewCard({ last4: '', expiry: '' });
+    if (newCard.cardNumber && newCard.cardName && newCard.expiryMonth && newCard.expiryYear && newCard.cvc) {
+      addPaymentMethod(newCard);
+      setNewCard({ cardNumber: '', cardName: '', expiryMonth: '', expiryYear: '', cvc: '' });
       setIsAddCardOpen(false);
       toast({ title: 'Card added', description: 'Your new payment method has been added.' });
+    } else {
+      toast({ title: 'Error', description: 'Please fill in all card details including secret number.', variant: 'destructive' });
     }
   };
 
@@ -145,17 +183,18 @@ export default function SettingsPage() {
   };
 
   const handleSubscribe = () => {
-    if (subscribeCard.cardNumber && subscribeCard.expiry && subscribeCard.cvc) {
-      resubscribe();
+    if (subscribeCard.cardNumber && subscribeCard.cardName && subscribeCard.expiry && subscribeCard.cvc) {
+      resubscribe(selectedPlan, subscribeCard);
       setIsSubscribeOpen(false);
-      setSubscribeCard({ cardNumber: '', expiry: '', cvc: '' });
-      toast({ title: 'Subscription activated', description: 'Welcome back! Your subscription is now active.' });
+      setSubscribeCard({ cardNumber: '', cardName: '', expiry: '', cvc: '' });
+      toast({ title: 'Subscription activated', description: `Welcome back! Your ${selectedPlan} plan is now active.` });
     } else {
       toast({ title: 'Error', description: 'Please fill in all payment details.', variant: 'destructive' });
     }
   };
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return 'Never';
     return new Date(dateString).toLocaleString();
   };
 
@@ -168,49 +207,68 @@ export default function SettingsPage() {
         <p className="text-muted-foreground">Manage your account preferences and settings.</p>
       </div>
 
-      <Tabs defaultValue="preferences" className="space-y-6">
+      <Tabs defaultValue="profile" className="space-y-6">
         <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="preferences">Preferences</TabsTrigger>
+          <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="reminders">Reminders</TabsTrigger>
           <TabsTrigger value="backup">Data Backup</TabsTrigger>
           <TabsTrigger value="subscription">Subscription</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="preferences" className="space-y-6">
+        <TabsContent value="profile" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <SettingsIcon className="w-5 h-5" />
-                Theme Settings
+                Profile & Preferences
               </CardTitle>
-              <CardDescription>Customize the appearance of your dashboard.</CardDescription>
+              <CardDescription>Manage your personal information and application theme.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <Label>Theme</Label>
-                <div className="grid grid-cols-3 gap-4">
-                  {[
-                    { value: 'light', label: 'Light', icon: Sun },
-                    { value: 'dark', label: 'Dark', icon: Moon },
-                    { value: 'system', label: 'System', icon: SettingsIcon },
-                  ].map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => setPendingTheme(option.value as 'light' | 'dark' | 'system')}
-                      className={`p-4 rounded-lg border-2 transition-colors ${
-                        pendingTheme === option.value 
-                          ? 'border-primary bg-primary/5' 
-                          : 'border-border hover:border-primary/50'
-                      }`}
-                    >
-                      <option.icon className="w-6 h-6 mx-auto mb-2" />
-                      <span className="text-sm font-medium">{option.label}</span>
-                    </button>
-                  ))}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="profileName">Full Name</Label>
+                  <Input
+                    id="profileName"
+                    value={pendingProfile.name}
+                    onChange={(e) => setPendingProfile(prev => ({ ...prev, name: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="profileEmail">Email Address</Label>
+                  <Input
+                    id="profileEmail"
+                    type="email"
+                    value={pendingProfile.email}
+                    onChange={(e) => setPendingProfile(prev => ({ ...prev, email: e.target.value }))}
+                  />
                 </div>
               </div>
-              <Button onClick={handleSavePreferences}>Save Preferences</Button>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="newPassword">New Password</Label>
+                  <Input
+                    id="newPassword"
+                    type="password"
+                    placeholder="Leave blank to keep current"
+                    value={pendingProfile.newPassword}
+                    onChange={(e) => setPendingProfile(prev => ({ ...prev, newPassword: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">Confirm Password</Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    placeholder="Match new password"
+                    value={pendingProfile.confirmPassword}
+                    onChange={(e) => setPendingProfile(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <Button onClick={handleSaveProfile}>Save Profile</Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -230,9 +288,9 @@ export default function SettingsPage() {
                   <p className="font-medium">Email Notifications</p>
                   <p className="text-sm text-muted-foreground">Receive alerts via email</p>
                 </div>
-                <Switch 
-                  checked={pendingNotifications.emailNotifications} 
-                  onCheckedChange={(checked) => setPendingNotifications(prev => ({ ...prev, emailNotifications: checked }))} 
+                <Switch
+                  checked={pendingNotifications.emailNotifications}
+                  onCheckedChange={(checked) => setPendingNotifications(prev => ({ ...prev, emailNotifications: checked }))}
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -240,9 +298,9 @@ export default function SettingsPage() {
                   <p className="font-medium">SMS Notifications</p>
                   <p className="text-sm text-muted-foreground">Receive critical alerts via SMS</p>
                 </div>
-                <Switch 
-                  checked={pendingNotifications.smsNotifications} 
-                  onCheckedChange={(checked) => setPendingNotifications(prev => ({ ...prev, smsNotifications: checked }))} 
+                <Switch
+                  checked={pendingNotifications.smsNotifications}
+                  onCheckedChange={(checked) => setPendingNotifications(prev => ({ ...prev, smsNotifications: checked }))}
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -250,9 +308,9 @@ export default function SettingsPage() {
                   <p className="font-medium">Webhook Notifications</p>
                   <p className="text-sm text-muted-foreground">Send alerts to your webhook endpoint</p>
                 </div>
-                <Switch 
-                  checked={pendingNotifications.webhookNotifications} 
-                  onCheckedChange={(checked) => setPendingNotifications(prev => ({ ...prev, webhookNotifications: checked }))} 
+                <Switch
+                  checked={pendingNotifications.webhookNotifications}
+                  onCheckedChange={(checked) => setPendingNotifications(prev => ({ ...prev, webhookNotifications: checked }))}
                 />
               </div>
               {pendingNotifications.webhookNotifications && (
@@ -278,7 +336,9 @@ export default function SettingsPage() {
                 <Clock className="w-5 h-5" />
                 Reminder Settings
               </CardTitle>
-              <CardDescription>Set up automated reminders and reports.</CardDescription>
+              <CardDescription>
+                Set up automated reminders and reports. Reminders work with our real-time notification system to keep you informed.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex items-center justify-between">
@@ -286,9 +346,9 @@ export default function SettingsPage() {
                   <p className="font-medium">Daily Digest</p>
                   <p className="text-sm text-muted-foreground">Receive a daily summary of alerts</p>
                 </div>
-                <Switch 
-                  checked={pendingReminders.dailyDigest} 
-                  onCheckedChange={(checked) => setPendingReminders(prev => ({ ...prev, dailyDigest: checked }))} 
+                <Switch
+                  checked={pendingReminders.dailyDigest}
+                  onCheckedChange={(checked) => setPendingReminders(prev => ({ ...prev, dailyDigest: checked }))}
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -296,15 +356,15 @@ export default function SettingsPage() {
                   <p className="font-medium">Weekly Security Report</p>
                   <p className="text-sm text-muted-foreground">Get a comprehensive weekly report</p>
                 </div>
-                <Switch 
-                  checked={pendingReminders.weeklyReport} 
-                  onCheckedChange={(checked) => setPendingReminders(prev => ({ ...prev, weeklyReport: checked }))} 
+                <Switch
+                  checked={pendingReminders.weeklyReport}
+                  onCheckedChange={(checked) => setPendingReminders(prev => ({ ...prev, weeklyReport: checked }))}
                 />
               </div>
               <div className="space-y-2">
                 <Label>Digest Time</Label>
-                <Select 
-                  value={pendingReminders.digestTime} 
+                <Select
+                  value={pendingReminders.digestTime}
                   onValueChange={(value) => setPendingReminders(prev => ({ ...prev, digestTime: value }))}
                 >
                   <SelectTrigger className="w-[200px]">
@@ -330,13 +390,15 @@ export default function SettingsPage() {
                 <Database className="w-5 h-5" />
                 Data Backup
               </CardTitle>
-              <CardDescription>Manage your data backup settings.</CardDescription>
+              <CardDescription>
+                Manage your data backup settings. Backups include your personal information, security logs, alert history, blocklist/whitelist data, and configuration settings.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">
                 <Label>Backup Frequency</Label>
-                <Select 
-                  value={pendingBackup.backupFrequency} 
+                <Select
+                  value={pendingBackup.backupFrequency}
                   onValueChange={(value: 'hourly' | 'daily' | 'weekly' | 'monthly') => setPendingBackup({ backupFrequency: value })}
                 >
                   <SelectTrigger className="w-full">
@@ -412,22 +474,53 @@ export default function SettingsPage() {
                       </DialogHeader>
                       <div className="space-y-4 py-4">
                         <div className="space-y-2">
-                          <Label htmlFor="last4">Last 4 digits of card</Label>
+                          <Label htmlFor="cardNumber">Card Number</Label>
                           <Input
-                            id="last4"
-                            placeholder="4242"
-                            maxLength={4}
-                            value={newCard.last4}
-                            onChange={(e) => setNewCard({ ...newCard, last4: e.target.value })}
+                            id="cardNumber"
+                            placeholder="4242 4242 4242 4242"
+                            value={newCard.cardNumber}
+                            onChange={(e) => setNewCard({ ...newCard, cardNumber: e.target.value })}
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="expiry">Expiry date</Label>
+                          <Label htmlFor="cardName">Cardholder Name</Label>
                           <Input
-                            id="expiry"
-                            placeholder="MM/YYYY"
-                            value={newCard.expiry}
-                            onChange={(e) => setNewCard({ ...newCard, expiry: e.target.value })}
+                            id="cardName"
+                            placeholder="John Doe"
+                            value={newCard.cardName}
+                            onChange={(e) => setNewCard({ ...newCard, cardName: e.target.value })}
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="expiryMonth">Expiry Month</Label>
+                            <Input
+                              id="expiryMonth"
+                              placeholder="MM"
+                              maxLength={2}
+                              value={newCard.expiryMonth}
+                              onChange={(e) => setNewCard({ ...newCard, expiryMonth: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="expiryYear">Expiry Year</Label>
+                            <Input
+                              id="expiryYear"
+                              placeholder="YYYY"
+                              maxLength={4}
+                              value={newCard.expiryYear}
+                              onChange={(e) => setNewCard({ ...newCard, expiryYear: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="newCardCvc">Secret Number (CVC)</Label>
+                          <Input
+                            id="newCardCvc"
+                            placeholder="123"
+                            maxLength={4}
+                            value={newCard.cvc}
+                            onChange={(e) => setNewCard({ ...newCard, cvc: e.target.value })}
                           />
                         </div>
                       </div>
@@ -438,7 +531,7 @@ export default function SettingsPage() {
                     </DialogContent>
                   </Dialog>
                 </div>
-                
+
                 {settings.paymentMethods.map((method) => (
                   <div key={method.id} className="p-4 rounded-lg border border-border flex items-center justify-between">
                     <div className="flex items-center gap-4">
@@ -455,8 +548,8 @@ export default function SettingsPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       {!method.isDefault && (
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
                           onClick={() => {
                             setDefaultPaymentMethod(method.id);
@@ -466,9 +559,9 @@ export default function SettingsPage() {
                           Set Default
                         </Button>
                       )}
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         className="text-destructive"
                         onClick={() => {
                           removePaymentMethod(method.id);
@@ -496,9 +589,40 @@ export default function SettingsPage() {
                         </DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4 py-4">
-                        <div className="p-4 rounded-lg bg-primary/5 border border-primary/20 mb-4">
-                          <p className="font-semibold">Professional Plan</p>
-                          <p className="text-2xl font-bold">$99/month</p>
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPlan('Small Companies')}
+                            className={`p-4 rounded-lg border-2 text-left transition-colors ${selectedPlan === 'Small Companies'
+                              ? 'border-primary bg-primary/5'
+                              : 'border-border hover:border-primary/50'
+                              }`}
+                          >
+                            <p className="font-semibold">Small Companies</p>
+                            <p className="text-xl font-bold text-primary">$99/mo</p>
+                            <p className="text-xs text-muted-foreground mt-1">Up to 10k alerts/mo</p>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPlan('Entropy')}
+                            className={`p-4 rounded-lg border-2 text-left transition-colors ${selectedPlan === 'Entropy'
+                              ? 'border-primary bg-primary/5'
+                              : 'border-border hover:border-primary/50'
+                              }`}
+                          >
+                            <p className="font-semibold">Entropy Plan</p>
+                            <p className="text-xl font-bold text-primary">$499/mo</p>
+                            <p className="text-xs text-muted-foreground mt-1">Unlimited alerts & premium support</p>
+                          </button>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="subCardName">Cardholder Name</Label>
+                          <Input
+                            id="subCardName"
+                            placeholder="John Doe"
+                            value={subscribeCard.cardName}
+                            onChange={(e) => setSubscribeCard({ ...subscribeCard, cardName: e.target.value })}
+                          />
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="cardNumber">Card Number</Label>
@@ -547,7 +671,7 @@ export default function SettingsPage() {
                       <AlertDialogHeader>
                         <AlertDialogTitle>Cancel Subscription?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This action will cancel your subscription at the end of your current billing period. 
+                          This action will cancel your subscription at the end of your current billing period.
                           You will lose access to premium features.
                         </AlertDialogDescription>
                       </AlertDialogHeader>

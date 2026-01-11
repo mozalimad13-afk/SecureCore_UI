@@ -39,11 +39,14 @@ export interface Pagination {
 
 export interface Alert {
     id: number;
-    ip: string;
-    type: string;
+    ip?: string;
+    source_ip?: string;
+    type?: string;
+    attack_type?: string;
     severity: 'Low' | 'Medium' | 'High' | 'Critical';
-    time: string;
-    timestamp: string;
+    time?: string;
+    timestamp?: string;
+    created_at?: string;
     confidence: number;
     status: 'active' | 'acknowledged' | 'resolved';
 }
@@ -105,9 +108,12 @@ export interface AdminStats {
 
 export interface Subscription {
     id: number;
-    plan: string;
+    plan_name: string;
+    plan_price: number;
     status: 'active' | 'expired' | 'trial';
-    expires_at: string;
+    next_billing_date: string | null;
+    max_requests_per_minute: number;
+    max_requests_per_month: number;
 }
 
 export interface PaymentMethod {
@@ -133,7 +139,24 @@ export interface PaymentMethodForm {
     cardName: string;
     expiryMonth: string;
     expiryYear: string;
+    cvc: string;
     billingAddress?: string;
     city?: string;
     zipCode?: string;
+}
+
+export interface AlertStats {
+    total_today: number;
+    blocked_threats: number;
+    severity_distribution: Record<string, number>;
+    weekly_trend: { date: string; alerts: number; blocked: number }[];
+    system_status?: 'healthy' | 'degraded' | 'critical' | 'error' | 'unknown' | string;
+}
+
+export interface AlertQueryParams {
+    page?: number;
+    per_page?: number;
+    severity?: string;
+    attack_type?: string;
+    acknowledged?: boolean;
 }

@@ -12,7 +12,9 @@ interface AuthContextType {
   unreadCount: number;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
+  clearAll: () => Promise<void>;
   addNotification: (notification: Omit<Notification, 'id' | 'read'>) => void;
+  updateProfile: (data: { name?: string; email?: string; currentPassword?: string; newPassword?: string }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -48,9 +50,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     loadNotifications();
-    // Poll for new notifications every 30 seconds
-    const interval = setInterval(loadNotifications, 30000);
-    return () => clearInterval(interval);
   }, [user]);
 
   const login = async (email: string, password: string): Promise<{ success: boolean; role: 'user' | 'admin' }> => {
@@ -92,6 +91,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const clearAll = async () => {
+    try {
+      await notificationsAPI.clearAllNotifications();
+      setNotifications([]);
+    } catch (error) {
+      console.error('Failed to clear all notifications:', error);
+      throw error;
+    }
+  };
+
   const addNotification = (notification: Omit<Notification, 'id' | 'read'>) => {
     const newNotification: Notification = {
       ...notification,
@@ -100,6 +109,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     setNotifications(prev => [newNotification, ...prev]);
   };
+  const updateProfile = async (data: { name?: string; email?: string; currentPassword?: string; newPassword?: string }) => {
+    try {
+      const response = await authAPI.updateProfile(data);
+      if (response.user) {
+        setUser(response.user as User);
+      }
+    } catch (error) {
+      console.error('Failed to update profile:', error);
+      throw error;
+    }
+  };
+
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -113,7 +134,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       unreadCount,
       markAsRead,
       markAllAsRead,
+      clearAll,
       addNotification,
+      updateProfile,
     }}>
       {children}
     </AuthContext.Provider>

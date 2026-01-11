@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/pagination';
 import { CheckCircle, Plus, Pencil, Trash2, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { whitelistAPI, blocklistAPI } from '@/services/api';
 
 const ITEMS_PER_PAGE = 15;
 
@@ -61,9 +62,33 @@ export default function WhitelistPage() {
   const [newIP, setNewIP] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [blocklistIPs, setBlocklistIPs] = useState<string[]>([]);
   const { toast } = useToast();
 
-  const filteredList = whitelist.filter(item => 
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [whiteData, blockData] = await Promise.all([
+          whitelistAPI.getWhitelist({ page: 1, per_page: 1000 }),
+          blocklistAPI.getBlocklist({ page: 1, per_page: 1000 })
+        ]);
+
+        const mappedWhite = whiteData.whitelisted_ips.map((item: any) => ({
+          id: item.id,
+          ip: item.ip_address,
+          description: item.description,
+          timestamp: new Date(item.created_at).toISOString().replace('T', ' ').substring(0, 19)
+        }));
+        setWhitelist(mappedWhite);
+        setBlocklistIPs(blockData.blocked_ips.map(item => item.ip_address));
+      } catch (error) {
+        // Silent fail as requested
+      }
+    };
+    loadData();
+  }, []);
+
+  const filteredList = whitelist.filter(item =>
     item.ip.includes(searchTerm) || item.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -73,40 +98,82 @@ export default function WhitelistPage() {
     currentPage * ITEMS_PER_PAGE
   );
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!newIP || !newDescription) {
       toast({ title: 'Error', description: 'Please fill in all fields', variant: 'destructive' });
       return;
     }
-    
-    const newItem: WhitelistedIP = {
-      id: Date.now(),
-      ip: newIP,
-      description: newDescription,
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-    };
-    
-    setWhitelist([newItem, ...whitelist]);
-    setNewIP('');
-    setNewDescription('');
-    setIsAddOpen(false);
-    toast({ title: 'IP Whitelisted', description: `${newIP} has been added to the whitelist.` });
+
+    // Check if already in whitelist
+    if (whitelist.some(item => item.ip === newIP)) {
+      toast({
+        title: 'Error',
+        description: `IP address ${newIP} is already in the whitelist.`,
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    // Check if in blocklist
+    if (blocklistIPs.includes(newIP)) {
+      toast({
+        title: 'Error',
+        description: `You can't add this IP to the whitelist because it's already in the blocklist.`,
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    try {
+      const data = await whitelistAPI.addIP(newIP, newDescription);
+      const newItem: WhitelistedIP = {
+        id: (data as any).id || Date.now(),
+        ip: newIP,
+        description: newDescription,
+        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+      };
+      setWhitelist([newItem, ...whitelist]);
+      setNewIP('');
+      setNewDescription('');
+      setIsAddOpen(false);
+      toast({ title: 'IP Whitelisted', description: `${newIP} has been added to the whitelist.` });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.error || error.message || 'Failed to add IP to whitelist.',
+        variant: 'destructive'
+      });
+    }
   };
 
-  const handleEdit = () => {
+  const handleEdit = async () => {
     if (!editingItem) return;
-    
-    setWhitelist(whitelist.map(item => 
-      item.id === editingItem.id ? editingItem : item
-    ));
-    setIsEditOpen(false);
-    setEditingItem(null);
-    toast({ title: 'Updated', description: 'Whitelist entry has been updated.' });
+
+    try {
+      await whitelistAPI.updateWhitelistedIP(editingItem.id, editingItem.description);
+      setWhitelist(whitelist.map(item =>
+        item.id === editingItem.id ? editingItem : item
+      ));
+      setIsEditOpen(false);
+      setEditingItem(null);
+      toast({ title: 'Updated', description: 'Whitelist entry has been updated.' });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.error || error.message || 'Failed to update whitelist entry.',
+        variant: 'destructive'
+      });
+    }
   };
 
-  const handleDelete = (id: number) => {
-    setWhitelist(whitelist.filter(item => item.id !== id));
-    toast({ title: 'Removed', description: 'IP has been removed from the whitelist.' });
+  const handleDelete = async (id: number) => {
+    try {
+      await whitelistAPI.removeIP(id);
+      setWhitelist(whitelist.filter(item => item.id !== id));
+      toast({ title: 'Removed', description: 'IP has been removed from the whitelist.' });
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to remove IP', variant: 'destructive' });
+    }
   };
 
   const renderPaginationItems = () => {
@@ -159,18 +226,18 @@ export default function WhitelistPage() {
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="ip">IP Address or CIDR</Label>
-                <Input 
-                  id="ip" 
-                  placeholder="192.168.1.1 or 10.0.0.0/24" 
+                <Input
+                  id="ip"
+                  placeholder="192.168.1.1 or 10.0.0.0/24"
                   value={newIP}
                   onChange={(e) => setNewIP(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="description">Description</Label>
-                <Input 
-                  id="description" 
-                  placeholder="Description of this IP" 
+                <Input
+                  id="description"
+                  placeholder="Description of this IP"
                   value={newDescription}
                   onChange={(e) => setNewDescription(e.target.value)}
                 />
@@ -189,8 +256,8 @@ export default function WhitelistPage() {
           <div className="flex items-center gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input 
-                placeholder="Search IP or description..." 
+              <Input
+                placeholder="Search IP or description..."
                 className="pl-10"
                 value={searchTerm}
                 onChange={(e) => {
@@ -225,8 +292,8 @@ export default function WhitelistPage() {
                     <td className="py-3 px-4 text-muted-foreground text-sm hidden lg:table-cell">{item.timestamp}</td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex justify-end gap-2">
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
                           onClick={() => {
                             setEditingItem(item);
@@ -235,9 +302,9 @@ export default function WhitelistPage() {
                         >
                           <Pencil className="w-4 h-4" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           className="text-destructive hover:text-destructive"
                           onClick={() => handleDelete(item.id)}
                         >
@@ -289,16 +356,16 @@ export default function WhitelistPage() {
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="edit-ip">IP Address</Label>
-                <Input 
-                  id="edit-ip" 
+                <Input
+                  id="edit-ip"
                   value={editingItem.ip}
-                  onChange={(e) => setEditingItem({ ...editingItem, ip: e.target.value })}
+                  disabled
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-description">Description</Label>
-                <Input 
-                  id="edit-description" 
+                <Input
+                  id="edit-description"
                   value={editingItem.description}
                   onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
                 />

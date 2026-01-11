@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Bell, AlertTriangle, Info, AlertCircle, Check } from 'lucide-react';
+import { Bell, AlertTriangle, Info, AlertCircle, Check, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 import {
   Pagination,
   PaginationContent,
@@ -34,14 +35,24 @@ const typeBgColors = {
 };
 
 export default function NotificationsPage() {
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useAuth();
+  const { notifications, unreadCount, markAsRead, markAllAsRead, clearAll } = useAuth();
   const [currentPage, setCurrentPage] = useState(1);
+  const { toast } = useToast();
 
   const totalPages = Math.ceil(notifications.length / ITEMS_PER_PAGE);
   const paginatedNotifications = notifications.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
+
+  const handleClearAll = async () => {
+    try {
+      await clearAll();
+      toast({ title: 'Notifications cleared' });
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to clear notifications', variant: 'destructive' });
+    }
+  };
 
   const renderPaginationItems = () => {
     const items = [];
@@ -78,12 +89,24 @@ export default function NotificationsPage() {
             View and manage all your notifications. {unreadCount > 0 && `You have ${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}.`}
           </p>
         </div>
-        {unreadCount > 0 && (
-          <Button variant="outline" onClick={markAllAsRead}>
-            <Check className="w-4 h-4 mr-2" />
-            Mark all as read
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {unreadCount > 0 && (
+            <Button variant="outline" onClick={markAllAsRead}>
+              <Check className="w-4 h-4 mr-2" />
+              Mark all read
+            </Button>
+          )}
+          {notifications.length > 0 && (
+            <Button
+              variant="outline"
+              className="text-red-500 border-red-500/50 hover:bg-red-500/10 dark:text-red-400 dark:border-red-400/50 dark:hover:bg-red-400/10 transition-colors"
+              onClick={handleClearAll}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Clear all
+            </Button>
+          )}
+        </div>
       </div>
 
       <Card>
@@ -127,8 +150,8 @@ export default function NotificationsPage() {
                           </div>
                           <div className="flex items-center gap-2">
                             {!notification.read && (
-                              <Button 
-                                variant="ghost" 
+                              <Button
+                                variant="ghost"
                                 size="sm"
                                 onClick={() => markAsRead(notification.id)}
                               >

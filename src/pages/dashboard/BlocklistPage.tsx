@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/pagination';
 import { Ban, Plus, Pencil, Trash2, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { blocklistAPI, whitelistAPI } from '@/services/api';
 
 const ITEMS_PER_PAGE = 15;
 
@@ -61,9 +62,34 @@ export default function BlocklistPage() {
   const [newIP, setNewIP] = useState('');
   const [newReason, setNewReason] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [whitelistIPs, setWhitelistIPs] = useState<string[]>([]);
   const { toast } = useToast();
 
-  const filteredList = blocklist.filter(item => 
+  // Load blocklist from backend
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [blockData, whiteData] = await Promise.all([
+          blocklistAPI.getBlocklist({ page: 1, per_page: 1000 }),
+          whitelistAPI.getWhitelist({ page: 1, per_page: 1000 })
+        ]);
+
+        const mappedBlock = blockData.blocked_ips.map((item: any) => ({
+          id: item.id,
+          ip: item.ip_address,
+          reason: item.reason,
+          timestamp: new Date(item.created_at).toISOString().replace('T', ' ').substring(0, 19)
+        }));
+        setBlocklist(mappedBlock);
+        setWhitelistIPs(whiteData.whitelisted_ips.map(item => item.ip_address));
+      } catch (error) {
+        // Silent fail as requested
+      }
+    };
+    loadData();
+  }, []);
+
+  const filteredList = blocklist.filter(item =>
     item.ip.includes(searchTerm) || item.reason.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -73,40 +99,82 @@ export default function BlocklistPage() {
     currentPage * ITEMS_PER_PAGE
   );
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!newIP || !newReason) {
       toast({ title: 'Error', description: 'Please fill in all fields', variant: 'destructive' });
       return;
     }
-    
-    const newItem: BlockedIP = {
-      id: Date.now(),
-      ip: newIP,
-      reason: newReason,
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-    };
-    
-    setBlocklist([newItem, ...blocklist]);
-    setNewIP('');
-    setNewReason('');
-    setIsAddOpen(false);
-    toast({ title: 'IP Blocked', description: `${newIP} has been added to the blocklist.` });
+
+    // Check if already in blocklist
+    if (blocklist.some(item => item.ip === newIP)) {
+      toast({
+        title: 'Error',
+        description: `IP address ${newIP} is already in the blocklist.`,
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    // Check if in whitelist
+    if (whitelistIPs.includes(newIP)) {
+      toast({
+        title: 'Error',
+        description: `You can't add this IP to the blocklist because it's already in the whitelist.`,
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    try {
+      const data = await blocklistAPI.blockIP(newIP, newReason);
+      const newItem: BlockedIP = {
+        id: (data as any).id || Date.now(),
+        ip: newIP,
+        reason: newReason,
+        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+      };
+      setBlocklist([newItem, ...blocklist]);
+      setNewIP('');
+      setNewReason('');
+      setIsAddOpen(false);
+      toast({ title: 'IP Blocked', description: `${newIP} has been added to the blocklist.` });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.error || error.message || 'Failed to add IP to blocklist.',
+        variant: 'destructive'
+      });
+    }
   };
 
-  const handleEdit = () => {
+  const handleEdit = async () => {
     if (!editingItem) return;
-    
-    setBlocklist(blocklist.map(item => 
-      item.id === editingItem.id ? editingItem : item
-    ));
-    setIsEditOpen(false);
-    setEditingItem(null);
-    toast({ title: 'Updated', description: 'Blocklist entry has been updated.' });
+
+    try {
+      await blocklistAPI.updateBlockedIP(editingItem.id, editingItem.reason);
+      setBlocklist(blocklist.map(item =>
+        item.id === editingItem.id ? editingItem : item
+      ));
+      setIsEditOpen(false);
+      setEditingItem(null);
+      toast({ title: 'Updated', description: 'Blocklist entry has been updated.' });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.error || error.message || 'Failed to update blocklist entry.',
+        variant: 'destructive'
+      });
+    }
   };
 
-  const handleDelete = (id: number) => {
-    setBlocklist(blocklist.filter(item => item.id !== id));
-    toast({ title: 'Removed', description: 'IP has been removed from the blocklist.' });
+  const handleDelete = async (id: number) => {
+    try {
+      await blocklistAPI.unblockIP(id);
+      setBlocklist(blocklist.filter(item => item.id !== id));
+      toast({ title: 'Removed', description: 'IP has been removed from the blocklist.' });
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to remove IP', variant: 'destructive' });
+    }
   };
 
   const renderPaginationItems = () => {
@@ -159,18 +227,18 @@ export default function BlocklistPage() {
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="ip">IP Address</Label>
-                <Input 
-                  id="ip" 
-                  placeholder="192.168.1.1" 
+                <Input
+                  id="ip"
+                  placeholder="192.168.1.1"
                   value={newIP}
                   onChange={(e) => setNewIP(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="reason">Reason</Label>
-                <Input 
-                  id="reason" 
-                  placeholder="Reason for blocking" 
+                <Input
+                  id="reason"
+                  placeholder="Reason for blocking"
                   value={newReason}
                   onChange={(e) => setNewReason(e.target.value)}
                 />
@@ -189,8 +257,8 @@ export default function BlocklistPage() {
           <div className="flex items-center gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input 
-                placeholder="Search IP or reason..." 
+              <Input
+                placeholder="Search IP or reason..."
                 className="pl-10"
                 value={searchTerm}
                 onChange={(e) => {
@@ -225,8 +293,8 @@ export default function BlocklistPage() {
                     <td className="py-3 px-4 text-muted-foreground text-sm hidden lg:table-cell">{item.timestamp}</td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex justify-end gap-2">
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
                           onClick={() => {
                             setEditingItem(item);
@@ -235,9 +303,9 @@ export default function BlocklistPage() {
                         >
                           <Pencil className="w-4 h-4" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           className="text-destructive hover:text-destructive"
                           onClick={() => handleDelete(item.id)}
                         >
@@ -289,16 +357,16 @@ export default function BlocklistPage() {
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="edit-ip">IP Address</Label>
-                <Input 
-                  id="edit-ip" 
+                <Input
+                  id="edit-ip"
                   value={editingItem.ip}
-                  onChange={(e) => setEditingItem({ ...editingItem, ip: e.target.value })}
+                  disabled
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-reason">Reason</Label>
-                <Input 
-                  id="edit-reason" 
+                <Input
+                  id="edit-reason"
                   value={editingItem.reason}
                   onChange={(e) => setEditingItem({ ...editingItem, reason: e.target.value })}
                 />

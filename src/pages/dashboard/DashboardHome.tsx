@@ -1,72 +1,190 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useRef, useEffect, useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Shield, AlertTriangle, CheckCircle, Activity, Ban, ShieldCheck } from 'lucide-react';
-import { 
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell 
-} from 'recharts';
-import { useToast } from '@/hooks/use-toast';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
+  DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
+import { Shield, AlertTriangle, Activity, Ban, CheckCircle, ArrowRight, Loader2, ShieldCheck } from 'lucide-react';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell
+} from 'recharts';
+import { useNavigate } from 'react-router-dom';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
+import { alertsAPI, blocklistAPI, whitelistAPI } from '@/services/api';
+import { Alert, AlertStats } from '@/types';
+import { useToast } from '@/hooks/use-toast';
 
-const statsData = [
-  { title: 'Total Alerts Today', value: '127', icon: AlertTriangle, color: 'text-warning' },
-  { title: 'Blocked Threats', value: '43', icon: Shield, color: 'text-destructive' },
-  { title: 'Whitelisted IPs', value: '256', icon: CheckCircle, color: 'text-success' },
-  { title: 'Network Health', value: '98.5%', icon: Activity, color: 'text-primary' },
-];
-
-const lineChartData = [
-  { name: 'Mon', alerts: 45, blocked: 12 },
-  { name: 'Tue', alerts: 52, blocked: 18 },
-  { name: 'Wed', alerts: 38, blocked: 8 },
-  { name: 'Thu', alerts: 65, blocked: 24 },
-  { name: 'Fri', alerts: 48, blocked: 15 },
-  { name: 'Sat', alerts: 31, blocked: 7 },
-  { name: 'Sun', alerts: 27, blocked: 5 },
-];
-
-const pieData = [
-  { name: 'Low', value: 45, color: '#22c55e' },
-  { name: 'Medium', value: 32, color: '#f59e0b' },
-  { name: 'High', value: 18, color: '#ef4444' },
-  { name: 'Critical', value: 5, color: '#7c3aed' },
-];
-
-const recentAlerts = [
-  { id: 1, ip: '192.168.1.105', type: 'Port Scan', severity: 'High', time: '2 min ago' },
-  { id: 2, ip: '10.0.0.45', type: 'Brute Force', severity: 'Critical', time: '5 min ago' },
-  { id: 3, ip: '172.16.0.88', type: 'DDoS Attempt', severity: 'Medium', time: '12 min ago' },
-  { id: 4, ip: '192.168.2.201', type: 'Malware Traffic', severity: 'High', time: '18 min ago' },
-  { id: 5, ip: '10.0.1.33', type: 'Suspicious Request', severity: 'Low', time: '25 min ago' },
-];
+const SEVERITY_COLORS: Record<string, string> = {
+  critical: '#7c3aed',
+  high: '#ef4444',
+  medium: '#f59e0b',
+  low: '#22c55e',
+  Critical: '#7c3aed',
+  High: '#ef4444',
+  Medium: '#f59e0b',
+  Low: '#22c55e',
+};
 
 const severityColors: Record<string, string> = {
+  low: 'bg-success/10 text-success',
+  medium: 'bg-warning/10 text-warning',
+  high: 'bg-destructive/10 text-destructive',
+  critical: 'bg-purple-500/10 text-purple-500',
   Low: 'bg-success/10 text-success',
   Medium: 'bg-warning/10 text-warning',
   High: 'bg-destructive/10 text-destructive',
   Critical: 'bg-purple-500/10 text-purple-500',
 };
 
+const getTimeRangeTitle = (range: string) => {
+  switch (range) {
+    case 'all': return 'All Time';
+    case 'month': return 'This Month';
+    case 'quarter': return 'This Quarter';
+    case 'year': return 'This Year';
+    default: return 'All Time';
+  }
+};
+
 export default function DashboardHome() {
-  const { toast } = useToast();
   const navigate = useNavigate();
+  const dashboardRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
-  const handleAddToBlocklist = (ip: string) => {
-    toast({ title: 'Added to Blocklist', description: `${ip} has been added to your blocklist.` });
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<AlertStats | null>(null);
+  const [recentAlerts, setRecentAlerts] = useState<Alert[]>([]);
+  const [blocklistCount, setBlocklistCount] = useState(0);
+  const [whitelistCount, setWhitelistCount] = useState(0);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        const [statsData, recentData, blocklistData, whitelistData] = await Promise.all([
+          alertsAPI.getStats('today'),
+          alertsAPI.getRecentAlerts(),
+          blocklistAPI.getBlocklist({ per_page: 1 }),
+          whitelistAPI.getWhitelist({ per_page: 1 })
+        ]);
+
+        setStats(statsData);
+        setRecentAlerts(recentData.recent_alerts);
+        setBlocklistCount(blocklistData.pagination.total);
+        setWhitelistCount(whitelistData.pagination.total);
+
+      } catch (error) {
+        toast({
+          title: 'Error',
+          description: 'Failed to load dashboard data.',
+          variant: 'destructive',
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, [toast]);
+
+  const handleAction = async (action: 'block' | 'whitelist', ip?: string) => {
+    if (!ip) return;
+
+    try {
+      if (action === 'block') {
+        await blocklistAPI.blockIP(ip, 'Added from Dashboard');
+        toast({ title: 'Success', description: `IP ${ip} blocked.` });
+      } else {
+        await whitelistAPI.addIP(ip, 'Added from Dashboard');
+        toast({ title: 'Success', description: `IP ${ip} whitelisted.` });
+      }
+
+      // Refresh the blocklist/whitelist counts
+      const [blocklistData, whitelistData] = await Promise.all([
+        blocklistAPI.getBlocklist({ per_page: 1 }),
+        whitelistAPI.getWhitelist({ per_page: 1 })
+      ]);
+      setBlocklistCount(blocklistData.pagination.total);
+      setWhitelistCount(whitelistData.pagination.total);
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.error || error.message || `Failed to ${action} IP.`,
+        variant: 'destructive'
+      });
+    }
   };
 
-  const handleAddToWhitelist = (ip: string) => {
-    toast({ title: 'Added to Whitelist', description: `${ip} has been added to your whitelist.` });
-  };
+  // Prepare Data for Charts
+  const pieDataRaw = stats ? Object.entries(stats.severity_distribution).map(([name, value]) => ({
+    name,
+    value,
+    color: SEVERITY_COLORS[name as keyof typeof SEVERITY_COLORS] || '#888888'
+  })) : [];
+
+  const hasPieData = pieDataRaw.some(item => item.value > 0);
+  const pieData = hasPieData
+    ? pieDataRaw.filter(item => item.value > 0)
+    : [{ name: 'No Data', value: 1, color: '#e5e7eb' }]; // Light grey for empty state
+
+  const lineChartData = stats ? stats.weekly_trend.map((day) => ({
+    name: day.date,
+    alerts: day.alerts,
+    blocked: day.blocked
+  })) : [];
+
+  const totalAlerts = stats ? Object.values(stats.severity_distribution).reduce((sum, count) => sum + count, 0) : 0;
+
+  const statsData = [
+    {
+      title: 'Total Alerts Today',
+      value: stats?.total_today?.toString() || '0',
+      icon: AlertTriangle,
+      color: 'text-warning'
+    },
+    {
+      title: 'Blocked Threats',
+      value: blocklistCount.toString(),
+      icon: Shield,
+      color: 'text-destructive'
+    },
+    {
+      title: 'Whitelisted IPs',
+      value: whitelistCount.toString(),
+      icon: CheckCircle,
+      color: 'text-success'
+    },
+    {
+      title: 'Network Health',
+      value: stats?.system_status ? (stats.system_status.charAt(0).toUpperCase() + stats.system_status.slice(1)) : '...',
+      icon: Activity,
+      color: stats?.system_status === 'healthy' ? 'text-primary' : 'text-warning'
+    },
+  ];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[600px]">
+        <Loader2 className="w-12 h-12 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" ref={dashboardRef}>
       <div>
         <h2 className="text-2xl font-bold mb-2">Welcome back!</h2>
         <p className="text-muted-foreground">Here's what's happening with your network security.</p>
@@ -124,16 +242,33 @@ export default function DashboardHome() {
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip
+                    formatter={(value, name) => [name === 'No Data' ? 0 : value, name]}
+                    contentStyle={{
+                      backgroundColor: '#ffffff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                      color: '#000000'
+                    }}
+                    itemStyle={{ color: '#000000' }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
               <div className="flex flex-wrap justify-center gap-4 mt-4">
-                {pieData.map((item) => (
-                  <div key={item.name} className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                    <span className="text-sm">{item.name}</span>
+                {!hasPieData ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-gray-200" />
+                    <span className="text-sm font-medium">No Data: 0</span>
                   </div>
-                ))}
+                ) : (
+                  pieDataRaw.map((item) => (
+                    <div key={item.name} className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                      <span className="text-sm font-medium">{item.name} {item.value}</span>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </CardContent>
@@ -141,8 +276,12 @@ export default function DashboardHome() {
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Recent Alerts</CardTitle>
+          <Button variant="outline" size="sm" onClick={() => navigate('/dashboard/alerts')}>
+            View All
+            <ArrowRight className="w-4 h-4 ml-2" />
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -157,40 +296,49 @@ export default function DashboardHome() {
                 </tr>
               </thead>
               <tbody>
-                {recentAlerts.map((alert) => (
-                  <tr key={alert.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
-                    <td className="py-3 px-4 font-mono text-sm">{alert.ip}</td>
-                    <td className="py-3 px-4">{alert.type}</td>
-                    <td className="py-3 px-4">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${severityColors[alert.severity]}`}>
-                        {alert.severity}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-muted-foreground text-sm">{alert.time}</td>
-                    <td className="py-3 px-4 text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="sm">Add to List</Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleAddToBlocklist(alert.ip)}>
-                            <Ban className="w-4 h-4 mr-2" />
-                            Add to Blocklist
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleAddToWhitelist(alert.ip)}>
-                            <ShieldCheck className="w-4 h-4 mr-2" />
-                            Add to Whitelist
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </td>
+                {recentAlerts.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="text-center py-4 text-muted-foreground">No recent alerts.</td>
                   </tr>
-                ))}
+                ) : (
+                  recentAlerts.slice(0, 5).map((alert) => (
+                    <tr key={alert.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
+                      <td className="py-3 px-4 font-mono text-sm">{alert.source_ip}</td>
+                      <td className="py-3 px-4">{alert.attack_type || 'Suspicious'}</td>
+                      <td className="py-3 px-4">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${severityColors[alert.severity] || 'bg-muted text-muted-foreground'}`}>
+                          {alert.severity}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-muted-foreground text-sm">
+                        {new Date(alert.created_at || '').toLocaleTimeString()}
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm">Add to List</Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleAction('block', alert.source_ip)}>
+                              <Ban className="w-4 h-4 mr-2" />
+                              Add to Blocklist
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleAction('whitelist', alert.source_ip)}>
+                              <ShieldCheck className="w-4 h-4 mr-2" />
+                              Add to Whitelist
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
         </CardContent>
       </Card>
+
     </div>
   );
 }

@@ -1,18 +1,19 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { 
-  Shield, 
-  Key, 
-  Bell, 
-  FileText, 
-  Ban, 
-  CheckCircle, 
-  Settings, 
+import {
+  Shield,
+  Key,
+  Bell,
+  FileText,
+  Ban,
+  CheckCircle,
+  Settings,
   Download,
   LogOut,
   LayoutDashboard
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
 
 const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
@@ -33,10 +34,10 @@ interface DashboardSidebarProps {
 export function DashboardSidebar({ onNavigate }: DashboardSidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
+  const { logout } = useAuth();
 
   const handleLogout = () => {
-    localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('userRole');
+    logout();
     navigate('/');
     onNavigate?.();
   };
@@ -58,9 +59,9 @@ export function DashboardSidebar({ onNavigate }: DashboardSidebarProps) {
 
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {menuItems.map((item) => {
-          const isActive = location.pathname === item.href || 
+          const isActive = location.pathname === item.href ||
             (item.href !== '/dashboard' && location.pathname.startsWith(item.href));
-          
+
           return (
             <Link
               key={item.href}
@@ -68,8 +69,8 @@ export function DashboardSidebar({ onNavigate }: DashboardSidebarProps) {
               onClick={handleLinkClick}
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors',
-                isActive 
-                  ? 'bg-sidebar-primary text-sidebar-primary-foreground' 
+                isActive
+                  ? 'bg-sidebar-primary text-sidebar-primary-foreground'
                   : 'text-sidebar-foreground hover:bg-sidebar-accent'
               )}
             >
@@ -81,8 +82,8 @@ export function DashboardSidebar({ onNavigate }: DashboardSidebarProps) {
       </nav>
 
       <div className="p-4 border-t border-sidebar-border">
-        <Button 
-          variant="ghost" 
+        <Button
+          variant="ghost"
           className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent"
           onClick={handleLogout}
         >
