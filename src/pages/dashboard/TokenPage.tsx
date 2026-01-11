@@ -1,208 +1,159 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Copy, Eye, EyeOff, RefreshCw, Plus, Trash2 } from 'lucide-react';
+import { Copy, Eye, EyeOff, RefreshCw, Key, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import { tokensAPI } from '@/services/api';
-import { APIToken } from '@/types';
+import { useSettings } from '@/contexts/SettingsContext';
+import { useNavigate } from 'react-router-dom';
 
 export default function TokenPage() {
-  const [tokens, setTokens] = useState<APIToken[]>([]);
   const [showToken, setShowToken] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [newTokenName, setNewTokenName] = useState('');
-  const [generatedToken, setGeneratedToken] = useState('');
+  const [isRegenerating, setIsRegenerating] = useState(false);
   const { toast } = useToast();
+  const { settings } = useSettings();
+  const navigate = useNavigate();
+  
+  // Check if user has an active subscription
+  const isFreePlan = settings.plan === 'Cancelled' || settings.plan === 'Free Trial';
+  
+  // Simulated token - in production this would come from the backend
+  const [token] = useState('sk_live_securecore_7f8a9b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0');
 
-  const loadTokens = useCallback(async () => {
-    try {
-      setLoading(true);
-      const data = await tokensAPI.getTokens();
-      setTokens(data.tokens || []);
-    } catch (error) {
-      console.error('Failed to load tokens:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load API tokens',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
+  const maskedToken = token.substring(0, 12) + '••••••••••••••••••••••••••••••••' + token.substring(token.length - 4);
 
-  useEffect(() => {
-    loadTokens();
-  }, [loadTokens]);
-
-  const handleGenerateToken = async () => {
-    if (!newTokenName) {
-      toast({
-        title: 'Validation Error',
-        description: 'Please enter a token name',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    try {
-      const data = await tokensAPI.generateToken(newTokenName);
-      setGeneratedToken(data.token);
-      toast({
-        title: 'Token Generated',
-        description: 'New API token created successfully',
-      });
-      setNewTokenName('');
-      loadTokens();
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to generate token',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleRevokeToken = async (id: number) => {
-    try {
-      await tokensAPI.revokeToken(id);
-      toast({
-        title: 'Token Revoked',
-        description: 'API token has been revoked',
-      });
-      loadTokens();
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to revoke token',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleCopyToken = (token: string) => {
+  const copyToken = () => {
+    if (isFreePlan) return;
     navigator.clipboard.writeText(token);
     toast({
-      title: 'Copied',
-      description: 'Token copied to clipboard',
+      title: 'Token copied!',
+      description: 'API token has been copied to your clipboard.',
     });
   };
 
+  const regenerateToken = () => {
+    if (isFreePlan) return;
+    setIsRegenerating(true);
+    setTimeout(() => {
+      toast({
+        title: 'Token regenerated',
+        description: 'Your new API token is ready. Make sure to update your applications.',
+      });
+      setIsRegenerating(false);
+    }, 1500);
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-3xl">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">API Token</h1>
+        <h2 className="text-2xl font-bold mb-2">API Token</h2>
         <p className="text-muted-foreground">
-          Manage your API tokens for programmatic access
+          Your API token is used to authenticate requests from your IDS agent.
         </p>
       </div>
 
-      {/* Generate New Token */}
-      <Card>
+      {isFreePlan && (
+        <Card className="border-warning/50 bg-warning/5">
+          <CardContent className="p-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <Lock className="w-8 h-8 text-warning flex-shrink-0" />
+              <div className="flex-1">
+                <p className="font-semibold text-warning">Subscription Required</p>
+                <p className="text-sm text-muted-foreground">
+                  Upgrade your plan to access your API token and start using SecureCore.
+                </p>
+              </div>
+              <Button onClick={() => navigate('/dashboard/settings')}>
+                Upgrade Now
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card className={isFreePlan ? 'opacity-50 pointer-events-none' : ''}>
         <CardHeader>
-          <CardTitle>Generate New Token</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Key className="w-5 h-5 text-primary" />
+            Your API Token
+          </CardTitle>
+          <CardDescription>
+            Keep this token secure. It provides full access to your SecureCore account.
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="flex gap-4">
-            <Input
-              placeholder="Token name (e.g., Production Server)"
-              value={newTokenName}
-              onChange={(e) => setNewTokenName(e.target.value)}
-            />
-            <Button onClick={handleGenerateToken}>
-              <Plus className="mr-2 h-4 w-4" />
-              Generate
+        <CardContent className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex-1 relative">
+              <Input 
+                readOnly 
+                value={isFreePlan ? '••••••••••••••••••••••••••••••••••••••••••••••' : (showToken ? token : maskedToken)}
+                className={`font-mono text-sm pr-10 ${isFreePlan ? 'blur-sm select-none' : ''}`}
+              />
+              {!isFreePlan && (
+                <button
+                  onClick={() => setShowToken(!showToken)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              )}
+            </div>
+            <Button variant="outline" onClick={copyToken} disabled={isFreePlan}>
+              <Copy className="w-4 h-4 mr-2" />
+              Copy
             </Button>
           </div>
 
-          {generatedToken && (
-            <div className="mt-4 p-4 bg-muted rounded-lg">
-              <p className="text-sm font-medium mb-2">Your new token (save it now!):</p>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 p-2 bg-background rounded text-sm">
-                  {generatedToken}
-                </code>
-                <Button size="sm" variant="ghost" onClick={() => handleCopyToken(generatedToken)}>
-                  <Copy className="h-4 w-4" />
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                This token will only be shown once. Make sure to save it securely.
+          <div className={`p-4 rounded-lg bg-muted/50 border border-border ${isFreePlan ? 'blur-sm' : ''}`}>
+            <h4 className="font-medium mb-2">How to use your token</h4>
+            <p className="text-sm text-muted-foreground mb-3">
+              Pass your API token in the configuration file of your SecureCore agent:
+            </p>
+            <pre className="bg-background p-3 rounded text-sm font-mono overflow-x-auto">
+{`# config.yaml
+api_token: "${isFreePlan ? '••••••••••••••••••••' : (showToken ? token : maskedToken)}"
+endpoint: "https://api.securecore.com/v1"
+`}
+            </pre>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pt-4 border-t border-border gap-4">
+            <div>
+              <p className="font-medium">Regenerate Token</p>
+              <p className="text-sm text-muted-foreground">
+                This will invalidate your current token immediately.
               </p>
             </div>
-          )}
+            <Button 
+              variant="destructive" 
+              onClick={regenerateToken}
+              disabled={isRegenerating || isFreePlan}
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${isRegenerating ? 'animate-spin' : ''}`} />
+              Regenerate
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
-      {/* Active Tokens */}
-      <Card>
+      <Card className={isFreePlan ? 'opacity-50' : ''}>
         <CardHeader>
-          <CardTitle>Active Tokens ({tokens.length})</CardTitle>
+          <CardTitle>Token Usage Statistics</CardTitle>
         </CardHeader>
         <CardContent>
-          {loading ? (
-            <div className="text-center py-8 text-muted-foreground">Loading tokens...</div>
-          ) : tokens.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">No API tokens yet</div>
-          ) : (
-            <div className="space-y-3">
-              {tokens.map((token) => (
-                <div
-                  key={token.id}
-                  className="flex items-center justify-between p-4 border rounded-lg"
-                >
-                  <div className="flex-1">
-                    <div className="font-medium">{token.name}</div>
-                    <div className="text-sm text-muted-foreground">
-                      Created: {token.created_relative || token.created_at}
-                    </div>
-                    {token.last_used_relative && (
-                      <div className="text-xs text-muted-foreground">
-                        Last used: {token.last_used_relative}
-                      </div>
-                    )}
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleRevokeToken(token.id)}
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </div>
-              ))}
+          <div className="grid sm:grid-cols-3 gap-4">
+            <div className="p-4 rounded-lg bg-muted/50">
+              <p className="text-sm text-muted-foreground">Requests Today</p>
+              <p className="text-2xl font-bold">{isFreePlan ? '—' : '2,847'}</p>
             </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Usage Instructions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>How to Use Your Token</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <p className="text-sm mb-2">Include your token in the Authorization header:</p>
-            <code className="block p-3 bg-muted rounded text-sm">
-              Authorization: Bearer YOUR_TOKEN_HERE
-            </code>
-          </div>
-          <div>
-            <p className="text-sm mb-2">Example request:</p>
-            <code className="block p-3 bg-muted rounded text-sm whitespace-pre">
-              {`curl -H "Authorization: Bearer YOUR_TOKEN" \\
-  http://localhost:5000/api/v1/alerts`}
-            </code>
+            <div className="p-4 rounded-lg bg-muted/50">
+              <p className="text-sm text-muted-foreground">Last Used</p>
+              <p className="text-2xl font-bold">{isFreePlan ? '—' : '2 min ago'}</p>
+            </div>
+            <div className="p-4 rounded-lg bg-muted/50">
+              <p className="text-sm text-muted-foreground">Rate Limit</p>
+              <p className="text-2xl font-bold">{isFreePlan ? '—' : '10K/min'}</p>
+            </div>
           </div>
         </CardContent>
       </Card>

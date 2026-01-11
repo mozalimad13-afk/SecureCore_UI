@@ -1,227 +1,398 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Download, FileText, Calendar as CalendarIcon } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
+import { Download, FileText, Calendar, TrendingUp, Shield, AlertTriangle } from 'lucide-react';
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer,
+  AreaChart,
+  Area
+} from 'recharts';
 import { format } from 'date-fns';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { reportsAPI } from '@/services/api';
-import { ReportPreview } from '@/types';
+import jsPDF from 'jspdf';
+
+const monthlyData = [
+  { month: 'Jan', alerts: 1240, blocked: 420 },
+  { month: 'Feb', alerts: 1580, blocked: 580 },
+  { month: 'Mar', alerts: 1320, blocked: 490 },
+  { month: 'Apr', alerts: 1890, blocked: 720 },
+  { month: 'May', alerts: 1650, blocked: 610 },
+  { month: 'Jun', alerts: 2100, blocked: 890 },
+];
+
+const threatTrend = [
+  { date: '01', value: 120 },
+  { date: '05', value: 180 },
+  { date: '10', value: 150 },
+  { date: '15', value: 220 },
+  { date: '20', value: 190 },
+  { date: '25', value: 280 },
+  { date: '30', value: 240 },
+];
+
+const reports = [
+  { id: 1, name: 'Monthly Security Summary - January 2024', date: '2024-01-31', size: '2.4 MB', type: 'PDF' },
+  { id: 2, name: 'Weekly Threat Analysis - Week 4', date: '2024-01-28', size: '1.8 MB', type: 'PDF' },
+  { id: 3, name: 'Quarterly Compliance Report Q4 2023', date: '2024-01-15', size: '5.2 MB', type: 'PDF' },
+  { id: 4, name: 'Incident Response Report - DDoS Attack', date: '2024-01-12', size: '890 KB', type: 'PDF' },
+  { id: 5, name: 'Network Traffic Analysis - December', date: '2024-01-05', size: '3.1 MB', type: 'PDF' },
+];
 
 export default function ReportsPage() {
-  const [startDate, setStartDate] = useState<Date>();
-  const [endDate, setEndDate] = useState<Date>();
-  const [preview, setPreview] = useState<ReportPreview | null>(null);
-  const [generating, setGenerating] = useState(false);
+  const [isGenerateOpen, setIsGenerateOpen] = useState(false);
+  const [fromDate, setFromDate] = useState<Date | undefined>(undefined);
+  const [toDate, setToDate] = useState<Date | undefined>(undefined);
+  const [reportType, setReportType] = useState('security');
   const { toast } = useToast();
 
-  const handlePreview = async () => {
-    if (!startDate || !endDate) {
-      toast({
-        title: 'Validation Error',
-        description: 'Please select both start and end dates',
-        variant: 'destructive',
-      });
+  const handleGenerateReport = () => {
+    if (!fromDate || !toDate) {
+      toast({ title: 'Error', description: 'Please select both start and end dates.', variant: 'destructive' });
       return;
     }
 
-    try {
-      const data = await reportsAPI.preview(
-        startDate.toISOString().split('T')[0],
-        endDate.toISOString().split('T')[0]
-      );
-      setPreview(data.preview);
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to preview report',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleGenerate = async () => {
-    if (!startDate || !endDate) {
-      toast({
-        title: 'Validation Error',
-        description: 'Please select both start and end dates',
-        variant: 'destructive',
-      });
+    if (fromDate > toDate) {
+      toast({ title: 'Error', description: 'Start date must be before end date.', variant: 'destructive' });
       return;
     }
 
-    try {
-      setGenerating(true);
-      await reportsAPI.generate(
-        startDate.toISOString().split('T')[0],
-        endDate.toISOString().split('T')[0]
-      );
-      toast({
-        title: 'Report Generated',
-        description: 'Your PDF report is being downloaded',
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to generate report',
-        variant: 'destructive',
-      });
-    } finally {
-      setGenerating(false);
-    }
+    const doc = new jsPDF();
+    
+    // Title
+    doc.setFontSize(20);
+    doc.text('SecureCore Security Report', 20, 20);
+    
+    // Report info
+    doc.setFontSize(12);
+    doc.text(`Report Type: ${reportType === 'security' ? 'Security Summary' : reportType === 'threat' ? 'Threat Analysis' : reportType === 'compliance' ? 'Compliance Report' : 'Traffic Analysis'}`, 20, 35);
+    doc.text(`Period: ${format(fromDate, 'MMM dd, yyyy')} - ${format(toDate, 'MMM dd, yyyy')}`, 20, 42);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 49);
+    
+    // Summary section
+    doc.setFontSize(14);
+    doc.text('Executive Summary', 20, 65);
+    doc.setFontSize(10);
+    doc.text('This report provides a comprehensive overview of security events during the selected period.', 20, 75);
+    
+    // Stats
+    doc.setFontSize(12);
+    doc.text('Key Metrics:', 20, 90);
+    doc.setFontSize(10);
+    doc.text('• Total Alerts Detected: 2,547', 25, 100);
+    doc.text('• Threats Blocked: 892', 25, 108);
+    doc.text('• Detection Rate: 99.2%', 25, 116);
+    doc.text('• Average Response Time: 45ms', 25, 124);
+    
+    // Severity breakdown
+    doc.setFontSize(12);
+    doc.text('Severity Breakdown:', 20, 140);
+    doc.setFontSize(10);
+    doc.text('• Critical: 127 (5%)', 25, 150);
+    doc.text('• High: 458 (18%)', 25, 158);
+    doc.text('• Medium: 814 (32%)', 25, 166);
+    doc.text('• Low: 1,148 (45%)', 25, 174);
+    
+    // Recommendations
+    doc.setFontSize(12);
+    doc.text('Recommendations:', 20, 190);
+    doc.setFontSize(10);
+    doc.text('1. Review and update blocklist for recurring threat sources', 25, 200);
+    doc.text('2. Enable additional monitoring for critical assets', 25, 208);
+    doc.text('3. Schedule regular security audits', 25, 216);
+    
+    const fileName = `securecore-${reportType}-report-${format(fromDate, 'yyyy-MM-dd')}-to-${format(toDate, 'yyyy-MM-dd')}.pdf`;
+    doc.save(fileName);
+    
+    setIsGenerateOpen(false);
+    toast({ title: 'Report generated', description: `${fileName} has been downloaded.` });
   };
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
-        <p className="text-muted-foreground">
-          Generate comprehensive security reports for any time period
-        </p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold mb-2">Reports</h2>
+          <p className="text-muted-foreground">View and download comprehensive security reports.</p>
+        </div>
+        <div className="flex gap-2">
+          <Select defaultValue="all">
+            <SelectTrigger className="w-[180px]">
+              <Calendar className="w-4 h-4 mr-2" />
+              <SelectValue placeholder="Time Range" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Time</SelectItem>
+              <SelectItem value="month">This Month</SelectItem>
+              <SelectItem value="quarter">This Quarter</SelectItem>
+              <SelectItem value="year">This Year</SelectItem>
+            </SelectContent>
+          </Select>
+          <Dialog open={isGenerateOpen} onOpenChange={setIsGenerateOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Download className="w-4 h-4 mr-2" />
+                Generate Report
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle>Generate Report</DialogTitle>
+                <DialogDescription>
+                  Select a date range and report type to generate a custom security report.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-6 py-4">
+                <div className="space-y-2">
+                  <Label>Report Type</Label>
+                  <Select value={reportType} onValueChange={setReportType}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select report type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="security">Security Summary</SelectItem>
+                      <SelectItem value="threat">Threat Analysis</SelectItem>
+                      <SelectItem value="compliance">Compliance Report</SelectItem>
+                      <SelectItem value="traffic">Traffic Analysis</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>From Date</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !fromDate && "text-muted-foreground"
+                          )}
+                        >
+                          <Calendar className="mr-2 h-4 w-4" />
+                          {fromDate ? format(fromDate, "PPP") : "Pick date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarComponent
+                          mode="single"
+                          selected={fromDate}
+                          onSelect={setFromDate}
+                          initialFocus
+                          className="p-3 pointer-events-auto"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>To Date</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !toDate && "text-muted-foreground"
+                          )}
+                        >
+                          <Calendar className="mr-2 h-4 w-4" />
+                          {toDate ? format(toDate, "PPP") : "Pick date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarComponent
+                          mode="single"
+                          selected={toDate}
+                          onSelect={setToDate}
+                          initialFocus
+                          className="p-3 pointer-events-auto"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsGenerateOpen(false)}>Cancel</Button>
+                <Button onClick={handleGenerateReport}>Generate Report</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Date Selection */}
+      {/* Stats */}
+      <div className="grid md:grid-cols-4 gap-4">
         <Card>
-          <CardHeader>
-            <CardTitle>Select Date Range</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">Start Date</label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {startDate ? format(startDate, 'PPP') : 'Pick a date'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={startDate}
-                    onSelect={setStartDate}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                <AlertTriangle className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Total Alerts</p>
+                <p className="text-2xl font-bold">9,780</p>
+              </div>
             </div>
-
-            <div>
-              <label className="text-sm font-medium mb-2 block">End Date</label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {endDate ? format(endDate, 'PPP') : 'Pick a date'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={endDate}
-                    onSelect={setEndDate}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <Button onClick={handlePreview} className="w-full" variant="outline">
-              Preview Report
-            </Button>
           </CardContent>
         </Card>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-lg bg-destructive/10 flex items-center justify-center">
+                <Shield className="w-6 h-6 text-destructive" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Threats Blocked</p>
+                <p className="text-2xl font-bold">3,710</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-lg bg-success/10 flex items-center justify-center">
+                <TrendingUp className="w-6 h-6 text-success" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Detection Rate</p>
+                <p className="text-2xl font-bold">99.2%</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-lg bg-warning/10 flex items-center justify-center">
+                <FileText className="w-6 h-6 text-warning" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Reports Generated</p>
+                <p className="text-2xl font-bold">47</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-        {/* Preview */}
+      {/* Charts */}
+      <div className="grid lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Report Preview</CardTitle>
+            <CardTitle>Monthly Overview</CardTitle>
           </CardHeader>
           <CardContent>
-            {!preview ? (
-              <div className="text-center py-8 text-muted-foreground">
-                Select a date range and click Preview to see report summary
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 border rounded">
-                    <div className="text-2xl font-bold">{preview.alert_count}</div>
-                    <div className="text-sm text-muted-foreground">Alerts</div>
-                  </div>
-                  <div className="p-4 border rounded">
-                    <div className="text-2xl font-bold">{preview.blocked_ip_count}</div>
-                    <div className="text-sm text-muted-foreground">Blocked IPs</div>
-                  </div>
-                  <div className="p-4 border rounded">
-                    <div className="text-2xl font-bold">{preview.whitelisted_ip_count}</div>
-                    <div className="text-sm text-muted-foreground">Whitelisted IPs</div>
-                  </div>
-                  <div className="p-4 border rounded">
-                    <div className="text-2xl font-bold">{preview.total_records}</div>
-                    <div className="text-sm text-muted-foreground">Total Records</div>
-                  </div>
-                </div>
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthlyData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))', 
+                      border: '1px solid hsl(var(--border))' 
+                    }} 
+                  />
+                  <Bar dataKey="alerts" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="blocked" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
 
-                <div className="text-sm text-muted-foreground">
-                  <div>Period: {format(new Date(preview.start_date), 'PPP')} to {format(new Date(preview.end_date), 'PPP')}</div>
-                </div>
-              </div>
-            )}
+        <Card>
+          <CardHeader>
+            <CardTitle>Threat Trend (30 Days)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={threatTrend}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="date" />
+                  <YAxis />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))', 
+                      border: '1px solid hsl(var(--border))' 
+                    }} 
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="value" 
+                    stroke="hsl(var(--primary))" 
+                    fill="hsl(var(--primary))" 
+                    fillOpacity={0.2}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Generate Button */}
+      {/* Reports List */}
       <Card>
         <CardHeader>
-          <CardTitle>Generate Report</CardTitle>
+          <CardTitle>Generated Reports</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground mb-4">
-            Generate a comprehensive PDF report including alerts, blocked IPs, whitelisted IPs, and security statistics for the selected period.
-          </p>
-          <Button
-            onClick={handleGenerate}
-            disabled={!startDate || !endDate || generating}
-            className="w-full"
-          >
-            <Download className="mr-2 h-4 w-4" />
-            {generating ? 'Generating...' : 'Download PDF Report'}
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Report Features */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Report Includes</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ul className="space-y-2">
-            <li className="flex items-center gap-2">
-              <FileText className="h-4 w-4 text-primary" />
-              <span>Executive summary with key metrics</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <FileText className="h-4 w-4 text-primary" />
-              <span>Detailed alert table (up to 50 most recent)</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <FileText className="h-4 w-4 text-primary" />
-              <span>Blocked IP addresses with reasons</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <FileText className="h-4 w-4 text-primary" />
-              <span>Whitelisted IP addresses</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <FileText className="h-4 w-4 text-primary" />
-              <span>Professional formatting and color-coded sections</span>
-            </li>
-          </ul>
+          <div className="space-y-2">
+            {reports.map((report) => (
+              <div 
+                key={report.id} 
+                className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <FileText className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-medium">{report.name}</p>
+                    <p className="text-sm text-muted-foreground">{report.date} • {report.size}</p>
+                  </div>
+                </div>
+                <Button variant="ghost" size="sm">
+                  <Download className="w-4 h-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
     </div>

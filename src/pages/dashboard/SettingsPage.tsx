@@ -5,19 +5,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
 } from '@/components/ui/select';
-import {
-  Settings as SettingsIcon,
-  Bell,
-  Clock,
-  Database,
-  CreditCard,
+import { 
+  Settings as SettingsIcon, 
+  Bell, 
+  Clock, 
+  Database, 
+  CreditCard, 
   Trash2,
   Plus,
   Moon,
@@ -46,22 +46,21 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { PaymentMethodForm } from '@/types';
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
-  const {
-    settings,
-    updateSettings,
-    addPaymentMethod,
-    removePaymentMethod,
+  const { 
+    settings, 
+    updateSettings, 
+    addPaymentMethod, 
+    removePaymentMethod, 
     setDefaultPaymentMethod,
     runBackupNow,
     cancelSubscription,
     resubscribe
   } = useSettings();
   const { toast } = useToast();
-
+  
   // Local state for pending changes (before saving)
   const [pendingTheme, setPendingTheme] = useState(theme);
   const [pendingNotifications, setPendingNotifications] = useState({
@@ -78,16 +77,8 @@ export default function SettingsPage() {
   const [pendingBackup, setPendingBackup] = useState({
     backupFrequency: settings.backupFrequency,
   });
-
-  const [newCard, setNewCard] = useState<PaymentMethodForm>({
-    cardNumber: '',
-    cardName: '',
-    expiryMonth: '',
-    expiryYear: '',
-    billingAddress: '',
-    city: '',
-    zipCode: ''
-  });
+  
+  const [newCard, setNewCard] = useState({ last4: '', expiry: '' });
   const [isAddCardOpen, setIsAddCardOpen] = useState(false);
   const [isSubscribeOpen, setIsSubscribeOpen] = useState(false);
   const [subscribeCard, setSubscribeCard] = useState({ cardNumber: '', expiry: '', cvc: '' });
@@ -140,21 +131,11 @@ export default function SettingsPage() {
   };
 
   const handleAddPaymentMethod = () => {
-    if (newCard.cardNumber && newCard.cardName && newCard.expiryMonth && newCard.expiryYear) {
-      addPaymentMethod(newCard);
-      setNewCard({
-        cardNumber: '',
-        cardName: '',
-        expiryMonth: '',
-        expiryYear: '',
-        billingAddress: '',
-        city: '',
-        zipCode: ''
-      });
+    if (newCard.last4.length === 4 && newCard.expiry) {
+      addPaymentMethod({ last4: newCard.last4, expiry: newCard.expiry, isDefault: false });
+      setNewCard({ last4: '', expiry: '' });
       setIsAddCardOpen(false);
       toast({ title: 'Card added', description: 'Your new payment method has been added.' });
-    } else {
-      toast({ title: 'Error', description: 'Please fill in all required fields.', variant: 'destructive' });
     }
   };
 
@@ -217,10 +198,11 @@ export default function SettingsPage() {
                     <button
                       key={option.value}
                       onClick={() => setPendingTheme(option.value as 'light' | 'dark' | 'system')}
-                      className={`p-4 rounded-lg border-2 transition-colors ${pendingTheme === option.value
-                        ? 'border-primary bg-primary/5'
-                        : 'border-border hover:border-primary/50'
-                        }`}
+                      className={`p-4 rounded-lg border-2 transition-colors ${
+                        pendingTheme === option.value 
+                          ? 'border-primary bg-primary/5' 
+                          : 'border-border hover:border-primary/50'
+                      }`}
                     >
                       <option.icon className="w-6 h-6 mx-auto mb-2" />
                       <span className="text-sm font-medium">{option.label}</span>
@@ -248,9 +230,9 @@ export default function SettingsPage() {
                   <p className="font-medium">Email Notifications</p>
                   <p className="text-sm text-muted-foreground">Receive alerts via email</p>
                 </div>
-                <Switch
-                  checked={pendingNotifications.emailNotifications}
-                  onCheckedChange={(checked) => setPendingNotifications(prev => ({ ...prev, emailNotifications: checked }))}
+                <Switch 
+                  checked={pendingNotifications.emailNotifications} 
+                  onCheckedChange={(checked) => setPendingNotifications(prev => ({ ...prev, emailNotifications: checked }))} 
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -258,9 +240,9 @@ export default function SettingsPage() {
                   <p className="font-medium">SMS Notifications</p>
                   <p className="text-sm text-muted-foreground">Receive critical alerts via SMS</p>
                 </div>
-                <Switch
-                  checked={pendingNotifications.smsNotifications}
-                  onCheckedChange={(checked) => setPendingNotifications(prev => ({ ...prev, smsNotifications: checked }))}
+                <Switch 
+                  checked={pendingNotifications.smsNotifications} 
+                  onCheckedChange={(checked) => setPendingNotifications(prev => ({ ...prev, smsNotifications: checked }))} 
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -268,9 +250,9 @@ export default function SettingsPage() {
                   <p className="font-medium">Webhook Notifications</p>
                   <p className="text-sm text-muted-foreground">Send alerts to your webhook endpoint</p>
                 </div>
-                <Switch
-                  checked={pendingNotifications.webhookNotifications}
-                  onCheckedChange={(checked) => setPendingNotifications(prev => ({ ...prev, webhookNotifications: checked }))}
+                <Switch 
+                  checked={pendingNotifications.webhookNotifications} 
+                  onCheckedChange={(checked) => setPendingNotifications(prev => ({ ...prev, webhookNotifications: checked }))} 
                 />
               </div>
               {pendingNotifications.webhookNotifications && (
@@ -304,9 +286,9 @@ export default function SettingsPage() {
                   <p className="font-medium">Daily Digest</p>
                   <p className="text-sm text-muted-foreground">Receive a daily summary of alerts</p>
                 </div>
-                <Switch
-                  checked={pendingReminders.dailyDigest}
-                  onCheckedChange={(checked) => setPendingReminders(prev => ({ ...prev, dailyDigest: checked }))}
+                <Switch 
+                  checked={pendingReminders.dailyDigest} 
+                  onCheckedChange={(checked) => setPendingReminders(prev => ({ ...prev, dailyDigest: checked }))} 
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -314,15 +296,15 @@ export default function SettingsPage() {
                   <p className="font-medium">Weekly Security Report</p>
                   <p className="text-sm text-muted-foreground">Get a comprehensive weekly report</p>
                 </div>
-                <Switch
-                  checked={pendingReminders.weeklyReport}
-                  onCheckedChange={(checked) => setPendingReminders(prev => ({ ...prev, weeklyReport: checked }))}
+                <Switch 
+                  checked={pendingReminders.weeklyReport} 
+                  onCheckedChange={(checked) => setPendingReminders(prev => ({ ...prev, weeklyReport: checked }))} 
                 />
               </div>
               <div className="space-y-2">
                 <Label>Digest Time</Label>
-                <Select
-                  value={pendingReminders.digestTime}
+                <Select 
+                  value={pendingReminders.digestTime} 
                   onValueChange={(value) => setPendingReminders(prev => ({ ...prev, digestTime: value }))}
                 >
                   <SelectTrigger className="w-[200px]">
@@ -353,8 +335,8 @@ export default function SettingsPage() {
             <CardContent className="space-y-6">
               <div className="space-y-2">
                 <Label>Backup Frequency</Label>
-                <Select
-                  value={pendingBackup.backupFrequency}
+                <Select 
+                  value={pendingBackup.backupFrequency} 
                   onValueChange={(value: 'hourly' | 'daily' | 'weekly' | 'monthly') => setPendingBackup({ backupFrequency: value })}
                 >
                   <SelectTrigger className="w-full">
@@ -430,92 +412,23 @@ export default function SettingsPage() {
                       </DialogHeader>
                       <div className="space-y-4 py-4">
                         <div className="space-y-2">
-                          <Label htmlFor="cardNumber">Card Number</Label>
+                          <Label htmlFor="last4">Last 4 digits of card</Label>
                           <Input
-                            id="cardNumber"
-                            placeholder="1234 5678 9012 3456"
-                            value={newCard.cardNumber}
-                            onChange={(e) => setNewCard({ ...newCard, cardNumber: e.target.value })}
+                            id="last4"
+                            placeholder="4242"
+                            maxLength={4}
+                            value={newCard.last4}
+                            onChange={(e) => setNewCard({ ...newCard, last4: e.target.value })}
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="cardName">Cardholder Name</Label>
+                          <Label htmlFor="expiry">Expiry date</Label>
                           <Input
-                            id="cardName"
-                            placeholder="John Doe"
-                            value={newCard.cardName}
-                            onChange={(e) => setNewCard({ ...newCard, cardName: e.target.value })}
+                            id="expiry"
+                            placeholder="MM/YYYY"
+                            value={newCard.expiry}
+                            onChange={(e) => setNewCard({ ...newCard, expiry: e.target.value })}
                           />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>Expiry Month</Label>
-                            <Select
-                              value={newCard.expiryMonth}
-                              onValueChange={(value) => setNewCard({ ...newCard, expiryMonth: value })}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="MM" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {Array.from({ length: 12 }, (_, i) => (
-                                  <SelectItem key={i + 1} value={String(i + 1).padStart(2, '0')}>
-                                    {String(i + 1).padStart(2, '0')}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Expiry Year</Label>
-                            <Select
-                              value={newCard.expiryYear}
-                              onValueChange={(value) => setNewCard({ ...newCard, expiryYear: value })}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="YY" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {Array.from({ length: 10 }, (_, i) => {
-                                  const year = new Date().getFullYear() + i;
-                                  return (
-                                    <SelectItem key={year} value={String(year).slice(-2)}>
-                                      {year}
-                                    </SelectItem>
-                                  );
-                                })}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="billingAddress">Billing Address</Label>
-                          <Input
-                            id="billingAddress"
-                            placeholder="123 Main St"
-                            value={newCard.billingAddress}
-                            onChange={(e) => setNewCard({ ...newCard, billingAddress: e.target.value })}
-                          />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="city">City</Label>
-                            <Input
-                              id="city"
-                              placeholder="City"
-                              value={newCard.city}
-                              onChange={(e) => setNewCard({ ...newCard, city: e.target.value })}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="zipCode">Zip Code</Label>
-                            <Input
-                              id="zipCode"
-                              placeholder="Zip Code"
-                              value={newCard.zipCode}
-                              onChange={(e) => setNewCard({ ...newCard, zipCode: e.target.value })}
-                            />
-                          </div>
                         </div>
                       </div>
                       <DialogFooter>
@@ -525,7 +438,7 @@ export default function SettingsPage() {
                     </DialogContent>
                   </Dialog>
                 </div>
-
+                
                 {settings.paymentMethods.map((method) => (
                   <div key={method.id} className="p-4 rounded-lg border border-border flex items-center justify-between">
                     <div className="flex items-center gap-4">
@@ -542,8 +455,8 @@ export default function SettingsPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       {!method.isDefault && (
-                        <Button
-                          variant="ghost"
+                        <Button 
+                          variant="ghost" 
                           size="sm"
                           onClick={() => {
                             setDefaultPaymentMethod(method.id);
@@ -553,9 +466,9 @@ export default function SettingsPage() {
                           Set Default
                         </Button>
                       )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
                         className="text-destructive"
                         onClick={() => {
                           removePaymentMethod(method.id);
@@ -634,7 +547,7 @@ export default function SettingsPage() {
                       <AlertDialogHeader>
                         <AlertDialogTitle>Cancel Subscription?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This action will cancel your subscription at the end of your current billing period.
+                          This action will cancel your subscription at the end of your current billing period. 
                           You will lose access to premium features.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
