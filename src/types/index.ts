@@ -6,6 +6,7 @@ export interface User {
     is_active?: boolean;
     last_login?: string;
     created_at?: string;
+    country?: string;
     alerts_count?: number;
     subscription?: {
         plan: string;
@@ -97,12 +98,11 @@ export interface SystemHealth {
 }
 
 export interface AdminStats {
-    total_users: number;
-    active_users: number;
+    total_companies: number;
     total_alerts: number;
     active_subscriptions: number;
     system_load: number;
-    user_growth: { month: string; users: number }[];
+    company_growth: { month: string; companies: number }[];
     revenue_trend: { month: string; revenue: number }[];
 }
 

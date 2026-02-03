@@ -9,14 +9,17 @@ import {
   Settings,
   Download,
   LogOut,
-  LayoutDashboard
+  LayoutDashboard,
+  Users
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserRole } from '@/hooks/useUserRole';
 
 const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
+  { icon: Users, label: 'Members', href: '/dashboard/members' },
   { icon: Key, label: 'API Token', href: '/dashboard/token' },
   { icon: Bell, label: 'Recent Alerts', href: '/dashboard/alerts' },
   { icon: FileText, label: 'Reports', href: '/dashboard/reports' },
@@ -35,6 +38,16 @@ export function DashboardSidebar({ onNavigate }: DashboardSidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { logout } = useAuth();
+  const { canAccessMembers, canAccessTokens, canAccessCompanySettings, canAccessDownloads } = useUserRole();
+
+  // Filter menu items based on role permissions
+  const filteredMenuItems = menuItems.filter(item => {
+    if (item.href === '/dashboard/members' && !canAccessMembers) return false;
+    if (item.href === '/dashboard/token' && !canAccessTokens) return false;
+    if (item.href === '/dashboard/downloads' && !canAccessDownloads) return false;
+    // Settings is handled differently in SettingsPage itself
+    return true;
+  });
 
   const handleLogout = () => {
     logout();
@@ -58,7 +71,7 @@ export function DashboardSidebar({ onNavigate }: DashboardSidebarProps) {
       </div>
 
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-        {menuItems.map((item) => {
+        {filteredMenuItems.map((item) => {
           const isActive = location.pathname === item.href ||
             (item.href !== '/dashboard' && location.pathname.startsWith(item.href));
 

@@ -6,6 +6,7 @@ import { Copy, Eye, EyeOff, RefreshCw, Key, Lock, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useNavigate } from 'react-router-dom';
+import { useUserRole } from '@/hooks/useUserRole';
 import { tokensAPI } from '@/services/api';
 
 export default function TokenPage() {
@@ -22,9 +23,22 @@ export default function TokenPage() {
   const { toast } = useToast();
   const { settings } = useSettings();
   const navigate = useNavigate();
+  const { canAccessTokens } = useUserRole();
+
+  // Route protection - redirect if user doesn't have access
+  useEffect(() => {
+    if (!canAccessTokens) {
+      toast({
+        title: 'Access Denied',
+        description: 'Only company admins can access API tokens.',
+        variant: 'destructive',
+      });
+      navigate('/dashboard');
+    }
+  }, [canAccessTokens, navigate, toast]);
 
   // Check if user has an active subscription
-  const isFreePlan = settings.plan === 'Cancelled' || settings.plan === 'Free Trial';
+  const isFreePlan = settings.plan === 'Cancelled';
 
   useEffect(() => {
     if (!isFreePlan) {
@@ -204,7 +218,7 @@ export default function TokenPage() {
             <pre className="bg-background p-3 rounded text-sm font-mono overflow-x-auto">
               {`# config.yaml
 api_token: "${isFreePlan ? '••••••••••••••••••••' : (token ? (showToken ? token : maskedToken) : 'YOUR_TOKEN_HERE')}"
-endpoint: "https://api.securecore.com/v1"
+endpoint: "https://api.securecore.com/ws/inference"
 `}
             </pre>
           </div>

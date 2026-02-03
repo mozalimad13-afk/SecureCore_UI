@@ -20,8 +20,9 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import { Ban, Plus, Pencil, Trash2, Search } from 'lucide-react';
+import { Ban, Plus, Pencil, Trash2, Search, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useUserRole } from '@/hooks/useUserRole';
 import { blocklistAPI, whitelistAPI } from '@/services/api';
 
 const ITEMS_PER_PAGE = 15;
@@ -33,28 +34,9 @@ interface BlockedIP {
   timestamp: string;
 }
 
-const initialBlocklist: BlockedIP[] = [
-  { id: 1, ip: '192.168.1.105', reason: 'Multiple brute force attempts', timestamp: '2024-01-15 14:32:15' },
-  { id: 2, ip: '10.0.0.45', reason: 'Port scanning activity', timestamp: '2024-01-15 12:18:42' },
-  { id: 3, ip: '172.16.0.88', reason: 'DDoS source', timestamp: '2024-01-14 09:45:33' },
-  { id: 4, ip: '192.168.2.201', reason: 'Malware distribution', timestamp: '2024-01-14 08:22:15' },
-  { id: 5, ip: '10.0.1.33', reason: 'Suspicious activity', timestamp: '2024-01-13 16:55:08' },
-  { id: 6, ip: '203.0.113.50', reason: 'Spam bot detected', timestamp: '2024-01-13 14:22:10' },
-  { id: 7, ip: '198.51.100.23', reason: 'SQL injection attempts', timestamp: '2024-01-12 11:45:22' },
-  { id: 8, ip: '192.0.2.100', reason: 'Credential stuffing', timestamp: '2024-01-12 09:18:45' },
-  { id: 9, ip: '10.0.2.55', reason: 'XSS attack attempts', timestamp: '2024-01-11 16:33:20' },
-  { id: 10, ip: '172.16.1.88', reason: 'Bot network activity', timestamp: '2024-01-11 14:15:30' },
-  { id: 11, ip: '192.168.3.101', reason: 'Unauthorized API access', timestamp: '2024-01-10 12:45:15' },
-  { id: 12, ip: '10.0.3.77', reason: 'Rate limit abuse', timestamp: '2024-01-10 10:22:08' },
-  { id: 13, ip: '172.16.2.99', reason: 'Directory traversal attempt', timestamp: '2024-01-09 15:18:42' },
-  { id: 14, ip: '192.168.4.150', reason: 'Malicious payload detected', timestamp: '2024-01-09 11:55:33' },
-  { id: 15, ip: '10.0.4.120', reason: 'Repeated failed logins', timestamp: '2024-01-08 09:42:18' },
-  { id: 16, ip: '172.16.3.45', reason: 'Suspicious user agent', timestamp: '2024-01-08 08:15:55' },
-  { id: 17, ip: '192.168.5.200', reason: 'Known malware IP', timestamp: '2024-01-07 16:28:40' },
-];
-
 export default function BlocklistPage() {
-  const [blocklist, setBlocklist] = useState<BlockedIP[]>(initialBlocklist);
+  const { canViewBlocklist, canManageBlocklist } = useUserRole();
+  const [blocklist, setBlocklist] = useState<BlockedIP[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -63,31 +45,43 @@ export default function BlocklistPage() {
   const [newReason, setNewReason] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [whitelistIPs, setWhitelistIPs] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   // Load blocklist from backend
   useEffect(() => {
     const loadData = async () => {
+      if (!canViewBlocklist) {
+        setLoading(false);
+        return;
+      }
       try {
+        setLoading(true);
         const [blockData, whiteData] = await Promise.all([
-          blocklistAPI.getBlocklist({ page: 1, per_page: 1000 }),
-          whitelistAPI.getWhitelist({ page: 1, per_page: 1000 })
+          blocklistAPI.getBlocklist({ page: 1, per_page: 1000 }).catch(() => ({ blocked_ips: [] })),
+          whitelistAPI.getWhitelist({ page: 1, per_page: 1000 }).catch(() => ({ whitelisted_ips: [] }))
         ]);
 
-        const mappedBlock = blockData.blocked_ips.map((item: any) => ({
+        type BlockedIPApi = { id: number; ip_address: string; reason?: string | null; created_at?: string | null };
+        const mappedBlock = (blockData.blocked_ips as BlockedIPApi[]).map((item) => ({
           id: item.id,
           ip: item.ip_address,
-          reason: item.reason,
-          timestamp: new Date(item.created_at).toISOString().replace('T', ' ').substring(0, 19)
+          reason: item.reason || '',
+          timestamp: item.created_at
+            ? new Date(item.created_at).toISOString().replace('T', ' ').substring(0, 19)
+            : new Date().toISOString().replace('T', ' ').substring(0, 19)
         }));
         setBlocklist(mappedBlock);
-        setWhitelistIPs(whiteData.whitelisted_ips.map(item => item.ip_address));
+        type WhitelistedIPApi = { ip_address: string };
+        setWhitelistIPs((whiteData.whitelisted_ips as WhitelistedIPApi[]).map((item) => item.ip_address));
       } catch (error) {
         // Silent fail as requested
+      } finally {
+        setLoading(false);
       }
     };
     loadData();
-  }, []);
+  }, [canViewBlocklist]);
 
   const filteredList = blocklist.filter(item =>
     item.ip.includes(searchTerm) || item.reason.toLowerCase().includes(searchTerm.toLowerCase())
@@ -128,7 +122,7 @@ export default function BlocklistPage() {
     try {
       const data = await blocklistAPI.blockIP(newIP, newReason);
       const newItem: BlockedIP = {
-        id: (data as any).id || Date.now(),
+        id: (data as { id?: number }).id || Date.now(),
         ip: newIP,
         reason: newReason,
         timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
@@ -138,10 +132,11 @@ export default function BlocklistPage() {
       setNewReason('');
       setIsAddOpen(false);
       toast({ title: 'IP Blocked', description: `${newIP} has been added to the blocklist.` });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { error?: string; message?: string };
       toast({
         title: 'Error',
-        description: error.error || error.message || 'Failed to add IP to blocklist.',
+        description: err.error || err.message || 'Failed to add IP to blocklist.',
         variant: 'destructive'
       });
     }
@@ -158,10 +153,11 @@ export default function BlocklistPage() {
       setIsEditOpen(false);
       setEditingItem(null);
       toast({ title: 'Updated', description: 'Blocklist entry has been updated.' });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { error?: string; message?: string };
       toast({
         title: 'Error',
-        description: error.error || error.message || 'Failed to update blocklist entry.',
+        description: err.error || err.message || 'Failed to update blocklist entry.',
         variant: 'destructive'
       });
     }
@@ -210,46 +206,48 @@ export default function BlocklistPage() {
           <h2 className="text-2xl font-bold mb-2">Block List</h2>
           <p className="text-muted-foreground">Manage blocked IP addresses.</p>
         </div>
-        <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              Add IP
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add IP to Blocklist</DialogTitle>
-              <DialogDescription>
-                Enter the IP address you want to block.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="ip">IP Address</Label>
-                <Input
-                  id="ip"
-                  placeholder="192.168.1.1"
-                  value={newIP}
-                  onChange={(e) => setNewIP(e.target.value)}
-                />
+        {canManageBlocklist && (
+          <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="w-4 h-4 mr-2" />
+                Add IP
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add IP to Blocklist</DialogTitle>
+                <DialogDescription>
+                  Enter the IP address you want to block.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="ip">IP Address</Label>
+                  <Input
+                    id="ip"
+                    placeholder="192.168.1.1"
+                    value={newIP}
+                    onChange={(e) => setNewIP(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="reason">Reason</Label>
+                  <Input
+                    id="reason"
+                    placeholder="Reason for blocking"
+                    value={newReason}
+                    onChange={(e) => setNewReason(e.target.value)}
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="reason">Reason</Label>
-                <Input
-                  id="reason"
-                  placeholder="Reason for blocking"
-                  value={newReason}
-                  onChange={(e) => setNewReason(e.target.value)}
-                />
-              </div>
-            </div>
-            <DialogFooter className="flex-col sm:flex-row gap-2">
-              <Button variant="outline" onClick={() => setIsAddOpen(false)}>Cancel</Button>
-              <Button onClick={handleAdd}>Add to Blocklist</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                <Button variant="outline" onClick={() => setIsAddOpen(false)}>Cancel</Button>
+                <Button onClick={handleAdd}>Add to Blocklist</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       <Card>
@@ -277,44 +275,60 @@ export default function BlocklistPage() {
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">IP Address</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Reason</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden lg:table-cell">Blocked At</th>
-                  <th className="text-right py-3 px-4 font-medium text-muted-foreground">Actions</th>
+                  {canManageBlocklist && <th className="text-right py-3 px-4 font-medium text-muted-foreground">Actions</th>}
                 </tr>
               </thead>
               <tbody>
-                {paginatedList.map((item) => (
-                  <tr key={item.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <Ban className="w-4 h-4 text-destructive flex-shrink-0" />
-                        <span className="font-mono text-sm">{item.ip}</span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{item.reason}</td>
-                    <td className="py-3 px-4 text-muted-foreground text-sm hidden lg:table-cell">{item.timestamp}</td>
-                    <td className="py-3 px-4 text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setEditingItem(item);
-                            setIsEditOpen(true);
-                          }}
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => handleDelete(item.id)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
+                {loading ? (
+                  <tr>
+                    <td colSpan={canManageBlocklist ? 4 : 3} className="text-center py-10">
+                      <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
                     </td>
                   </tr>
-                ))}
+                ) : paginatedList.length === 0 ? (
+                  <tr>
+                    <td colSpan={canManageBlocklist ? 4 : 3} className="text-center py-10 text-muted-foreground">
+                      No blocked IPs found.
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedList.map((item) => (
+                    <tr key={item.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2">
+                          <Ban className="w-4 h-4 text-destructive flex-shrink-0" />
+                          <span className="font-mono text-sm">{item.ip}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{item.reason}</td>
+                      <td className="py-3 px-4 text-muted-foreground text-sm hidden lg:table-cell">{item.timestamp}</td>
+                      {canManageBlocklist && (
+                        <td className="py-3 px-4 text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditingItem(item);
+                                setIsEditOpen(true);
+                              }}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => handleDelete(item.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

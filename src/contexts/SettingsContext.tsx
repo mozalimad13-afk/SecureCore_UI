@@ -77,14 +77,15 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const loadSettings = useCallback(async () => {
     try {
       setLoading(true);
-      // Get the role from auth to check if we should call user-only endpoints
-      const { user } = auth; // We need the user object
-      const isUser = user?.role === 'user';
+      if (!user) return;
+
+      const companyRole = (user as any)?.company_role;
+      const isAdmin = user?.role === 'admin' || companyRole === 'admin';
 
       const [settingsData, subscriptionData, paymentMethodsData] = await Promise.all([
-        isUser ? settingsAPI.getSettings() : Promise.resolve({ settings: defaultSettings }),
-        isUser ? subscriptionAPI.getSubscription().catch(() => null) : Promise.resolve(null),
-        isUser ? paymentMethodsAPI.getPaymentMethods().catch(() => ({ payment_methods: [] })) : Promise.resolve({ payment_methods: [] }),
+        isAdmin ? settingsAPI.getSettings().catch(() => ({ settings: defaultSettings })) : Promise.resolve({ settings: defaultSettings }),
+        isAdmin ? subscriptionAPI.getSubscription().catch(() => null) : Promise.resolve(null),
+        isAdmin ? paymentMethodsAPI.getPaymentMethods().catch(() => ({ payment_methods: [] })) : Promise.resolve({ payment_methods: [] }),
       ]);
 
       // Handle the case where settingsData might be wrapped in a 'settings' property or be the object itself
@@ -119,7 +120,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [auth]);
+  }, [auth, user]);
 
   // Only load settings when user is authenticated
   useEffect(() => {
@@ -252,7 +253,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const subscriptionStatus = settings.plan === 'Cancelled' ? 'suspended' : (settings.plan === 'Free' ? 'trial' : 'active');
+  const subscriptionStatus = settings.plan === 'Cancelled' ? 'suspended' : (settings.plan === 'Free' || settings.plan === 'Free Trial' ? 'trial' : 'active');
   const isSuspended = subscriptionStatus === 'suspended';
 
   return (

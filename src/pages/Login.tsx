@@ -23,7 +23,7 @@ export default function Login() {
     setIsLoading(true);
 
     const result = await login(email, password);
-    
+
     if (result.success) {
       if (result.role === 'admin') {
         toast({ title: 'Welcome Admin!', description: 'Redirecting to admin dashboard...' });
@@ -33,7 +33,11 @@ export default function Login() {
         navigate('/dashboard');
       }
     } else {
-      toast({ title: 'Error', description: 'Please enter valid credentials', variant: 'destructive' });
+      toast({
+        title: 'Error',
+        description: result.error || 'Please enter valid credentials',
+        variant: 'destructive'
+      });
     }
     setIsLoading(false);
   };

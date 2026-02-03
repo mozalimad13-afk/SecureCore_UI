@@ -6,7 +6,7 @@ import { User, Notification } from '../types';
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; role: 'user' | 'admin' }>;
+  login: (email: string, password: string) => Promise<{ success: boolean; role: 'user' | 'admin'; error?: string }>;
   logout: () => void;
   notifications: Notification[];
   unreadCount: number;
@@ -18,6 +18,8 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export { AuthContext };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -36,10 +38,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadUser();
   }, []);
 
-  // Load notifications when user is authenticated
+  // Load notifications when user is authenticated (only for company admins)
   useEffect(() => {
     const loadNotifications = async () => {
       if (!user) return;
+
+      // Only load notifications for company admins
+      const companyRole = (user as any)?.company_role;
+      const isServiceAdmin = user?.role === 'admin';
+      const isCompanyAdmin = companyRole === 'admin';
+
+      if (!isServiceAdmin && !isCompanyAdmin) {
+        // Full and limited users don't have access to notifications
+        return;
+      }
 
       try {
         const data = await notificationsAPI.getNotifications();
@@ -52,14 +64,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadNotifications();
   }, [user]);
 
-  const login = async (email: string, password: string): Promise<{ success: boolean; role: 'user' | 'admin' }> => {
+  const login = async (email: string, password: string): Promise<{ success: boolean; role: 'user' | 'admin'; error?: string }> => {
     try {
       const userData = await authAPI.login(email, password);
       setUser(userData.user as User);
       return { success: true, role: userData.user.role as 'user' | 'admin' };
     } catch (error) {
       console.error('Login failed:', error);
-      return { success: false, role: 'user' };
+      const errorMessage = error instanceof Error ? error.message : 'Login failed';
+      return { success: false, role: 'user', error: errorMessage };
     }
   };
 

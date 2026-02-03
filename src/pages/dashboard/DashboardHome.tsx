@@ -26,6 +26,7 @@ import { jsPDF } from 'jspdf';
 import { alertsAPI, blocklistAPI, whitelistAPI } from '@/services/api';
 import { Alert, AlertStats } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { useUserRole } from '@/hooks/useUserRole';
 
 const SEVERITY_COLORS: Record<string, string> = {
   critical: '#7c3aed',
@@ -63,6 +64,7 @@ export default function DashboardHome() {
   const navigate = useNavigate();
   const dashboardRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const { canViewBlocklist, canViewWhitelist, canManageBlocklist, canManageWhitelist } = useUserRole();
 
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<AlertStats | null>(null);
@@ -77,14 +79,14 @@ export default function DashboardHome() {
         const [statsData, recentData, blocklistData, whitelistData] = await Promise.all([
           alertsAPI.getStats('today'),
           alertsAPI.getRecentAlerts(),
-          blocklistAPI.getBlocklist({ per_page: 1 }),
-          whitelistAPI.getWhitelist({ per_page: 1 })
+          canViewBlocklist ? blocklistAPI.getBlocklist({ per_page: 1 }).catch(() => null) : Promise.resolve(null),
+          canViewWhitelist ? whitelistAPI.getWhitelist({ per_page: 1 }).catch(() => null) : Promise.resolve(null)
         ]);
 
         setStats(statsData);
         setRecentAlerts(recentData.recent_alerts);
-        setBlocklistCount(blocklistData.pagination.total);
-        setWhitelistCount(whitelistData.pagination.total);
+        if (blocklistData) setBlocklistCount(blocklistData.pagination.total);
+        if (whitelistData) setWhitelistCount(whitelistData.pagination.total);
 
       } catch (error) {
         toast({
@@ -98,10 +100,19 @@ export default function DashboardHome() {
     };
 
     fetchDashboardData();
-  }, [toast]);
+  }, [toast, canViewBlocklist, canViewWhitelist]);
 
   const handleAction = async (action: 'block' | 'whitelist', ip?: string) => {
     if (!ip) return;
+
+    if (action === 'block' && !canManageBlocklist) {
+      toast({ title: 'Permission Denied', description: 'You do not have permission to block IPs.', variant: 'destructive' });
+      return;
+    }
+    if (action === 'whitelist' && !canManageWhitelist) {
+      toast({ title: 'Permission Denied', description: 'You do not have permission to whitelist IPs.', variant: 'destructive' });
+      return;
+    }
 
     try {
       if (action === 'block') {
@@ -114,11 +125,11 @@ export default function DashboardHome() {
 
       // Refresh the blocklist/whitelist counts
       const [blocklistData, whitelistData] = await Promise.all([
-        blocklistAPI.getBlocklist({ per_page: 1 }),
-        whitelistAPI.getWhitelist({ per_page: 1 })
+        canViewBlocklist ? blocklistAPI.getBlocklist({ per_page: 1 }).catch(() => null) : Promise.resolve(null),
+        canViewWhitelist ? whitelistAPI.getWhitelist({ per_page: 1 }).catch(() => null) : Promise.resolve(null)
       ]);
-      setBlocklistCount(blocklistData.pagination.total);
-      setWhitelistCount(whitelistData.pagination.total);
+      if (blocklistData) setBlocklistCount(blocklistData.pagination.total);
+      if (whitelistData) setWhitelistCount(whitelistData.pagination.total);
     } catch (error: any) {
       toast({
         title: 'Error',

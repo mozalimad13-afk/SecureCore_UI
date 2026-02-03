@@ -37,13 +37,13 @@ const generateLogs = () => {
   const statusCodes = [200, 201, 301, 400, 401, 403, 404, 500, 502];
   const paths = [
     '/api/v1/alerts',
-    '/api/v1/users',
+    '/api/v1/admin/users',
     '/api/v1/auth/login',
-    '/api/v1/token',
+    '/api/v1/tokens',
     '/api/v1/blocklist',
     '/api/v1/whitelist',
     '/api/v1/reports',
-    '/health',
+    '/api/v1/admin/health',
     '/api/v1/notifications',
   ];
   const ips = [

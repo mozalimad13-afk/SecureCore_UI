@@ -187,10 +187,11 @@ export default function AlertsPage() {
         title: 'Success',
         description: `${ip} added to blocklist`,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { error?: string; message?: string };
       toast({
         title: 'Error',
-        description: error.error || error.message || 'Failed to block IP.',
+        description: err.error || err.message || 'Failed to block IP.',
         variant: 'destructive',
       });
     }
@@ -203,10 +204,11 @@ export default function AlertsPage() {
         title: 'Success',
         description: `${ip} added to whitelist`,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { error?: string; message?: string };
       toast({
         title: 'Error',
-        description: error.error || error.message || 'Failed to whitelist IP.',
+        description: err.error || err.message || 'Failed to whitelist IP.',
         variant: 'destructive',
       });
     }

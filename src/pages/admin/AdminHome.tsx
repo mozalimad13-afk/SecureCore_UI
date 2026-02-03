@@ -103,11 +103,8 @@ export default function AdminHome() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Users</p>
-                <p className="text-3xl font-bold mt-1">{stats?.total_users.toLocaleString() || '0'}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {stats?.active_users.toLocaleString() || '0'} active
-                </p>
+                <p className="text-sm text-muted-foreground">Total Companies</p>
+                <p className="text-3xl font-bold mt-1">{stats?.total_companies.toLocaleString() || '0'}</p>
               </div>
               <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
                 <Users className="w-6 h-6" />
@@ -167,12 +164,12 @@ export default function AdminHome() {
       <div className="grid lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>User Growth</CardTitle>
+            <CardTitle>Company Growth</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={stats?.user_growth || []}>
+                <LineChart data={stats?.company_growth || []}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="month" />
                   <YAxis />
@@ -184,7 +181,7 @@ export default function AdminHome() {
                   />
                   <Line
                     type="monotone"
-                    dataKey="users"
+                    dataKey="companies"
                     stroke="hsl(var(--primary))"
                     strokeWidth={2}
                     dot={{ fill: 'hsl(var(--primary))' }}
@@ -245,19 +242,33 @@ export default function AdminHome() {
                 </tr>
               </thead>
               <tbody>
-                {recentUsers.map((user) => (
-                  <tr key={user.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
-                    <td className="py-3 px-4 font-medium">{user.name}</td>
-                    <td className="py-3 px-4 text-muted-foreground">{user.email}</td>
-                    <td className="py-3 px-4">{user.subscription?.plan || 'Free'}</td>
-                    <td className="py-3 px-4">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${user.is_active ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
-                        {user.is_active ? 'Active' : 'Suspended'}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-muted-foreground text-sm">{user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}</td>
-                  </tr>
-                ))}
+                {recentUsers.map((user) => {
+                  const getCompanyStatus = (company: User) => {
+                    const status = company.subscription?.status?.toLowerCase();
+                    if (status === 'active') return 'Active';
+                    if (status === 'trial') return 'Trial';
+                    if (status === 'expired') return 'Expired';
+                    if (status === 'cancelled') return 'Cancelled';
+                    if (company.subscription?.plan && company.subscription.plan !== 'Free') return 'Active';
+                    return 'Trial';
+                  };
+                  const statusValue = getCompanyStatus(user);
+                  const statusColor = statusColors[statusValue] || statusColors.Trial;
+
+                  return (
+                    <tr key={user.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
+                      <td className="py-3 px-4 font-medium">{user.name}</td>
+                      <td className="py-3 px-4 text-muted-foreground">{user.email}</td>
+                      <td className="py-3 px-4">{user.subscription?.plan || 'Free'}</td>
+                      <td className="py-3 px-4">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColor}`}>
+                          {statusValue}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-muted-foreground text-sm">{user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

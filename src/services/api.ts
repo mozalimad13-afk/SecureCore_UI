@@ -43,8 +43,16 @@ async function apiRequest<T>(
         ...options.headers,
     };
 
-    // For state-changing requests, include CSRF token
-    if (options.method && !['GET', 'HEAD', 'OPTIONS'].includes(options.method)) {
+    // For state-changing requests, include CSRF token.
+    // IMPORTANT: Do not attempt to fetch CSRF before login/register.
+    // Those endpoints intentionally cannot rely on an existing session.
+    const csrfExcludedEndpoints = new Set<string>([
+        '/auth/login',
+        '/auth/register',
+        '/auth/csrf-token',
+    ]);
+
+    if (options.method && !['GET', 'HEAD', 'OPTIONS'].includes(options.method) && !csrfExcludedEndpoints.has(endpoint)) {
         if (!csrfToken) {
             await fetchCSRFToken();
         }
@@ -129,6 +137,15 @@ export const authAPI = {
             method: 'PUT',
             body: JSON.stringify(data),
         });
+    },
+};
+
+// Locations API
+export const locationsAPI = {
+    getCountries: async () => {
+        return apiRequest<{ countries: Array<{ id: number; code: string; name: string }> }>(
+            '/locations/countries'
+        );
     },
 };
 
@@ -242,6 +259,40 @@ export const settingsAPI = {
     },
 };
 
+// Members API
+export const membersAPI = {
+    listMembers: async () => {
+        return apiRequest<{ members: Array<User & { company_role?: string }> }>('/members');
+    },
+    createMember: async (data: { name: string; email: string; role?: string; password?: string; country?: string }) => {
+        return apiRequest<{ member: User & { company_role?: string } }>('/members', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    },
+    updateMemberRole: async (memberId: number, role: string) => {
+        return apiRequest<{ member: User & { company_role?: string } }>(`/members/${memberId}/role`, {
+            method: 'PATCH',
+            body: JSON.stringify({ role }),
+        });
+    },
+    deactivateMember: async (memberId: number) => {
+        return apiRequest<{ member: User & { company_role?: string } }>(`/members/${memberId}/deactivate`, {
+            method: 'POST',
+        });
+    },
+    activateMember: async (memberId: number) => {
+        return apiRequest<{ member: User & { company_role?: string } }>(`/members/${memberId}/activate`, {
+            method: 'POST',
+        });
+    },
+    deleteMember: async (memberId: number) => {
+        return apiRequest<{ message: string }>(`/members/${memberId}`, {
+            method: 'DELETE',
+        });
+    },
+};
+
 // API Tokens
 export const tokensAPI = {
     getTokens: async () => {
@@ -307,7 +358,7 @@ export const reportsAPI = {
     },
 
     list: async () => {
-        return apiRequest<{ reports: any[] }>('/reports/list');
+        return apiRequest<{ reports: Array<Record<string, unknown>> }>('/reports/list');
     },
 
     upload: async (file: File) => {
@@ -322,7 +373,6 @@ export const reportsAPI = {
         const response = await fetch(`${API_BASE_URL}${API_PREFIX}/reports/upload`, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`,
                 'X-CSRF-Token': csrfToken || '',
             },
             body: formData,
@@ -391,6 +441,42 @@ export const adminAPI = {
 
     getNotificationHistory: async () => {
         return apiRequest<{ history: AdminBroadcast[] }>('/admin/notifications/history');
+    },
+
+    setCompanyPlan: async (companyId: number, plan: 'Free' | 'Small Companies' | 'Enterprise') => {
+        return apiRequest<{ subscription: { plan: string; status: string; expires_at: string | null } | null }>(
+            `/admin/companies/${companyId}/subscription`,
+            { method: 'PUT', body: JSON.stringify({ plan }) }
+        );
+    },
+
+    cancelCompanySubscription: async (companyId: number) => {
+        return apiRequest<{ subscription: { plan: string; status: string; expires_at: string | null } | null }>(
+            `/admin/companies/${companyId}/subscription/cancel`,
+            { method: 'POST' }
+        );
+    },
+
+    updateUser: async (userId: number, data: { name?: string; email?: string; role?: 'user' | 'admin'; password?: string }) => {
+        return apiRequest<{ user: User }>(`/admin/users/${userId}`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    },
+
+    deleteUser: async (userId: number) => {
+        return apiRequest<{ message: string }>(`/admin/users/${userId}`, { method: 'DELETE' });
+    },
+
+    getRoles: async () => {
+        return apiRequest<{ roles: string[] }>('/admin/roles');
+    },
+
+    updateUserCompanyRole: async (userId: number, role: string) => {
+        return apiRequest<{ message: string; user_id: number; role: string }>(`/admin/users/${userId}/company-role`, {
+            method: 'PUT',
+            body: JSON.stringify({ role }),
+        });
     },
 };
 

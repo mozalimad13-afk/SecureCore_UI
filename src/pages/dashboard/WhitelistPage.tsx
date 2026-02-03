@@ -20,8 +20,9 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import { CheckCircle, Plus, Pencil, Trash2, Search } from 'lucide-react';
+import { CheckCircle, Plus, Pencil, Trash2, Search, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useUserRole } from '@/hooks/useUserRole';
 import { whitelistAPI, blocklistAPI } from '@/services/api';
 
 const ITEMS_PER_PAGE = 15;
@@ -33,28 +34,9 @@ interface WhitelistedIP {
   timestamp: string;
 }
 
-const initialWhitelist: WhitelistedIP[] = [
-  { id: 1, ip: '10.0.0.1', description: 'Main office gateway', timestamp: '2024-01-15 10:15:22' },
-  { id: 2, ip: '192.168.1.0/24', description: 'Internal network subnet', timestamp: '2024-01-14 14:32:45' },
-  { id: 3, ip: '172.16.0.50', description: 'Backup server', timestamp: '2024-01-12 09:08:33' },
-  { id: 4, ip: '10.0.1.100', description: 'Development server', timestamp: '2024-01-10 16:42:18' },
-  { id: 5, ip: '192.168.2.1', description: 'Branch office router', timestamp: '2024-01-08 11:25:55' },
-  { id: 6, ip: '10.0.2.50', description: 'Monitoring server', timestamp: '2024-01-07 09:15:30' },
-  { id: 7, ip: '172.16.1.100', description: 'Database server', timestamp: '2024-01-06 14:22:18' },
-  { id: 8, ip: '192.168.3.0/24', description: 'Guest network', timestamp: '2024-01-05 11:45:42' },
-  { id: 9, ip: '10.0.3.75', description: 'Load balancer', timestamp: '2024-01-04 16:33:55' },
-  { id: 10, ip: '172.16.2.25', description: 'API gateway', timestamp: '2024-01-03 10:18:22' },
-  { id: 11, ip: '192.168.4.10', description: 'CI/CD server', timestamp: '2024-01-02 08:55:15' },
-  { id: 12, ip: '10.0.4.200', description: 'Staging server', timestamp: '2024-01-01 15:42:30' },
-  { id: 13, ip: '172.16.3.150', description: 'VPN gateway', timestamp: '2023-12-31 12:28:45' },
-  { id: 14, ip: '192.168.5.0/24', description: 'Server room subnet', timestamp: '2023-12-30 09:15:18' },
-  { id: 15, ip: '10.0.5.100', description: 'DNS server', timestamp: '2023-12-29 16:45:55' },
-  { id: 16, ip: '172.16.4.75', description: 'Mail server', timestamp: '2023-12-28 11:22:33' },
-  { id: 17, ip: '192.168.6.50', description: 'Log aggregator', timestamp: '2023-12-27 14:55:42' },
-];
-
 export default function WhitelistPage() {
-  const [whitelist, setWhitelist] = useState<WhitelistedIP[]>(initialWhitelist);
+  const { canViewWhitelist, canManageWhitelist } = useUserRole();
+  const [whitelist, setWhitelist] = useState<WhitelistedIP[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -63,30 +45,42 @@ export default function WhitelistPage() {
   const [newDescription, setNewDescription] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [blocklistIPs, setBlocklistIPs] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
     const loadData = async () => {
+      if (!canViewWhitelist) {
+        setLoading(false);
+        return;
+      }
       try {
+        setLoading(true);
         const [whiteData, blockData] = await Promise.all([
-          whitelistAPI.getWhitelist({ page: 1, per_page: 1000 }),
-          blocklistAPI.getBlocklist({ page: 1, per_page: 1000 })
+          whitelistAPI.getWhitelist({ page: 1, per_page: 1000 }).catch(() => ({ whitelisted_ips: [] })),
+          blocklistAPI.getBlocklist({ page: 1, per_page: 1000 }).catch(() => ({ blocked_ips: [] }))
         ]);
 
-        const mappedWhite = whiteData.whitelisted_ips.map((item: any) => ({
+        type WhitelistedIPApi = { id: number; ip_address: string; description?: string | null; created_at?: string | null };
+        const mappedWhite = (whiteData.whitelisted_ips as WhitelistedIPApi[]).map((item) => ({
           id: item.id,
           ip: item.ip_address,
-          description: item.description,
-          timestamp: new Date(item.created_at).toISOString().replace('T', ' ').substring(0, 19)
+          description: item.description || '',
+          timestamp: item.created_at
+            ? new Date(item.created_at).toISOString().replace('T', ' ').substring(0, 19)
+            : new Date().toISOString().replace('T', ' ').substring(0, 19)
         }));
         setWhitelist(mappedWhite);
-        setBlocklistIPs(blockData.blocked_ips.map(item => item.ip_address));
+        type BlockedIPApi = { ip_address: string };
+        setBlocklistIPs((blockData.blocked_ips as BlockedIPApi[]).map((item) => item.ip_address));
       } catch (error) {
         // Silent fail as requested
+      } finally {
+        setLoading(false);
       }
     };
     loadData();
-  }, []);
+  }, [canViewWhitelist]);
 
   const filteredList = whitelist.filter(item =>
     item.ip.includes(searchTerm) || item.description.toLowerCase().includes(searchTerm.toLowerCase())
@@ -127,7 +121,7 @@ export default function WhitelistPage() {
     try {
       const data = await whitelistAPI.addIP(newIP, newDescription);
       const newItem: WhitelistedIP = {
-        id: (data as any).id || Date.now(),
+        id: (data as { id?: number }).id || Date.now(),
         ip: newIP,
         description: newDescription,
         timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
@@ -137,10 +131,11 @@ export default function WhitelistPage() {
       setNewDescription('');
       setIsAddOpen(false);
       toast({ title: 'IP Whitelisted', description: `${newIP} has been added to the whitelist.` });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { error?: string; message?: string };
       toast({
         title: 'Error',
-        description: error.error || error.message || 'Failed to add IP to whitelist.',
+        description: err.error || err.message || 'Failed to add IP to whitelist.',
         variant: 'destructive'
       });
     }
@@ -157,10 +152,11 @@ export default function WhitelistPage() {
       setIsEditOpen(false);
       setEditingItem(null);
       toast({ title: 'Updated', description: 'Whitelist entry has been updated.' });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { error?: string; message?: string };
       toast({
         title: 'Error',
-        description: error.error || error.message || 'Failed to update whitelist entry.',
+        description: err.error || err.message || 'Failed to update whitelist entry.',
         variant: 'destructive'
       });
     }
@@ -209,46 +205,48 @@ export default function WhitelistPage() {
           <h2 className="text-2xl font-bold mb-2">White List</h2>
           <p className="text-muted-foreground">Manage trusted IP addresses.</p>
         </div>
-        <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              Add IP
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add IP to Whitelist</DialogTitle>
-              <DialogDescription>
-                Enter the IP address you want to whitelist.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="ip">IP Address or CIDR</Label>
-                <Input
-                  id="ip"
-                  placeholder="192.168.1.1 or 10.0.0.0/24"
-                  value={newIP}
-                  onChange={(e) => setNewIP(e.target.value)}
-                />
+        {canManageWhitelist && (
+          <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="w-4 h-4 mr-2" />
+                Add IP
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add IP to Whitelist</DialogTitle>
+                <DialogDescription>
+                  Enter the IP address you want to whitelist.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="ip">IP Address or CIDR</Label>
+                  <Input
+                    id="ip"
+                    placeholder="192.168.1.1 or 10.0.0.0/24"
+                    value={newIP}
+                    onChange={(e) => setNewIP(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Input
+                    id="description"
+                    placeholder="Description of this IP"
+                    value={newDescription}
+                    onChange={(e) => setNewDescription(e.target.value)}
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
-                <Input
-                  id="description"
-                  placeholder="Description of this IP"
-                  value={newDescription}
-                  onChange={(e) => setNewDescription(e.target.value)}
-                />
-              </div>
-            </div>
-            <DialogFooter className="flex-col sm:flex-row gap-2">
-              <Button variant="outline" onClick={() => setIsAddOpen(false)}>Cancel</Button>
-              <Button onClick={handleAdd}>Add to Whitelist</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                <Button variant="outline" onClick={() => setIsAddOpen(false)}>Cancel</Button>
+                <Button onClick={handleAdd}>Add to Whitelist</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       <Card>
@@ -276,44 +274,60 @@ export default function WhitelistPage() {
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">IP Address</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Description</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden lg:table-cell">Added At</th>
-                  <th className="text-right py-3 px-4 font-medium text-muted-foreground">Actions</th>
+                  {canManageWhitelist && <th className="text-right py-3 px-4 font-medium text-muted-foreground">Actions</th>}
                 </tr>
               </thead>
               <tbody>
-                {paginatedList.map((item) => (
-                  <tr key={item.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 text-success flex-shrink-0" />
-                        <span className="font-mono text-sm">{item.ip}</span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{item.description}</td>
-                    <td className="py-3 px-4 text-muted-foreground text-sm hidden lg:table-cell">{item.timestamp}</td>
-                    <td className="py-3 px-4 text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setEditingItem(item);
-                            setIsEditOpen(true);
-                          }}
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => handleDelete(item.id)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
+                {loading ? (
+                  <tr>
+                    <td colSpan={canManageWhitelist ? 4 : 3} className="text-center py-10">
+                      <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
                     </td>
                   </tr>
-                ))}
+                ) : paginatedList.length === 0 ? (
+                  <tr>
+                    <td colSpan={canManageWhitelist ? 4 : 3} className="text-center py-10 text-muted-foreground">
+                      No whitelisted IPs found.
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedList.map((item) => (
+                    <tr key={item.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="w-4 h-4 text-success flex-shrink-0" />
+                          <span className="font-mono text-sm">{item.ip}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{item.description}</td>
+                      <td className="py-3 px-4 text-muted-foreground text-sm hidden lg:table-cell">{item.timestamp}</td>
+                      {canManageWhitelist && (
+                        <td className="py-3 px-4 text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditingItem(item);
+                                setIsEditOpen(true);
+                              }}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => handleDelete(item.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

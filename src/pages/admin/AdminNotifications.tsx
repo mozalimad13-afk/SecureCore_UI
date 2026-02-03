@@ -106,12 +106,17 @@ const priorityColors = {
   critical: 'text-destructive',
 };
 
-// Map backend types to local UI types
+// Map backend types to local UI types with detailed tracking
 const mapType = (type: string): 'user' | 'system' | 'security' | 'alert' => {
   if (type === 'user_registration') return 'user';
   if (type === 'system_health') return 'system';
   if (type === 'security') return 'security';
   return 'alert';
+};
+
+// Get detailed type for filtering
+const getDetailedType = (notification: any): string => {
+  return notification.related_type || notification.type || 'alert';
 };
 
 export default function AdminNotifications() {
@@ -154,6 +159,7 @@ export default function AdminNotifications() {
         setSystemNotifications(notesRes.notifications.map((n: AppNotification) => ({
           ...n,
           type: mapType(n.related_type || n.type),
+          detailedType: n.related_type || n.type || 'alert',
           priority: n.type === 'alert' ? 'high' : 'medium',
           time: n.created_at ? format(new Date(n.created_at), 'MMM d, p') : 'Just now'
         })));
@@ -178,7 +184,13 @@ export default function AdminNotifications() {
     return systemNotifications.filter(notification => {
       if (typeFilter === 'all') return true;
       if (typeFilter === 'unread') return !notification.read;
-      return notification.type === typeFilter;
+      if (typeFilter === 'user_registration') {
+        return (notification as any).detailedType === 'user_registration' || notification.type === 'user';
+      }
+      if (typeFilter === 'system_health') {
+        return (notification as any).detailedType === 'system_health' || notification.type === 'system';
+      }
+      return false;
     });
   }, [systemNotifications, typeFilter]);
 
@@ -343,10 +355,8 @@ export default function AdminNotifications() {
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
                   <SelectItem value="unread">Unread Only</SelectItem>
-                  <SelectItem value="user">User Events</SelectItem>
-                  <SelectItem value="system">System Health</SelectItem>
-                  <SelectItem value="security">Security</SelectItem>
-                  <SelectItem value="alert">Alerts</SelectItem>
+                  <SelectItem value="user_registration">New Registrations</SelectItem>
+                  <SelectItem value="system_health">System Health</SelectItem>
                 </SelectContent>
               </Select>
               {unreadCount > 0 && (
@@ -647,7 +657,11 @@ export default function AdminNotifications() {
                     </div>
                     <p className="text-sm text-muted-foreground mb-2">{notification.message}</p>
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                      <span>Recipients: {notification.recipient_count}</span>
+                      <span>
+                        Recipients: {(notification as any).recipients_display ?? notification.target ?? notification.recipient_count}
+                      </span>
+                      <span>•</span>
+                      <span>Count: {notification.recipient_count}</span>
                       <span>•</span>
                       <span>{notification.sent_at}</span>
                     </div>

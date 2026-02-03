@@ -70,8 +70,19 @@ export default function ReportsPage() {
   const [reportType, setReportType] = useState('security');
   const [reportName, setReportName] = useState('');
   const [timeRange, setTimeRange] = useState('all');
-  const [stats, setStats] = useState<any>(null);
-  const [generatedReports, setGeneratedReports] = useState<any[]>([]);
+  type WeeklyTrendItem = { date: string; alerts: number; blocked: number };
+  type ReportsStats = {
+    total_alerts?: number;
+    total_today?: number;
+    blocked_threats?: number;
+    system_status?: string;
+    severity_distribution?: Record<string, number>;
+    weekly_trend?: WeeklyTrendItem[];
+  };
+  type ReportListItem = { filename?: string; created_at?: string; size?: number } & Record<string, unknown>;
+
+  const [stats, setStats] = useState<ReportsStats | null>(null);
+  const [generatedReports, setGeneratedReports] = useState<ReportListItem[]>([]);
   const { toast } = useToast();
 
   // Load stats and reports from backend
@@ -94,7 +105,7 @@ export default function ReportsPage() {
   // Transform trend data for charts
   const monthlyData = useMemo(() => {
     if (!stats?.weekly_trend) return [];
-    return stats.weekly_trend.map((item: any) => ({
+    return stats.weekly_trend.map((item) => ({
       month: item.date,
       alerts: item.alerts,
       blocked: item.blocked
@@ -103,7 +114,7 @@ export default function ReportsPage() {
 
   const threatTrend = useMemo(() => {
     if (!stats?.weekly_trend) return [];
-    return stats.weekly_trend.map((item: any) => ({
+    return stats.weekly_trend.map((item) => ({
       date: item.date,
       value: item.alerts
     }));
@@ -193,7 +204,7 @@ export default function ReportsPage() {
       setGeneratedReports(reportsData.reports || []);
 
       toast({ title: 'Report saved', description: `${fileName} has been saved to server.` });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({ title: 'Error', description: 'Report generated but failed to save to server.', variant: 'destructive' });
     }
 
@@ -323,7 +334,7 @@ export default function ReportsPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Alerts</p>
-                <p className="text-2xl font-bold">{(stats as any)?.total_alerts || stats?.total_today || 0}</p>
+                <p className="text-2xl font-bold">{stats?.total_alerts || stats?.total_today || 0}</p>
               </div>
             </div>
           </CardContent>

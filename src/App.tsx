@@ -7,6 +7,14 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
 import { NotificationPopupProvider } from "@/contexts/NotificationPopupContext";
+import { useRealtimeAlerts } from "@/hooks/useRealtimeAlerts";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+
+function RealtimeBridge() {
+  useRealtimeAlerts();
+  return null;
+}
+
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -22,6 +30,7 @@ import WhitelistPage from "./pages/dashboard/WhitelistPage";
 import SettingsPage from "./pages/dashboard/SettingsPage";
 import DownloadsPage from "./pages/dashboard/DownloadsPage";
 import NotificationsPage from "./pages/dashboard/NotificationsPage";
+import MembersPage from "./pages/dashboard/MembersPage";
 import { AdminLayout } from "./components/admin/AdminLayout";
 import AdminHome from "./pages/admin/AdminHome";
 import AdminUsers from "./pages/admin/AdminUsers";
@@ -41,6 +50,7 @@ const App = () => (
             <Sonner />
             <BrowserRouter>
               <NotificationPopupProvider>
+                <RealtimeBridge />
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/login" element={<Login />} />
@@ -50,18 +60,51 @@ const App = () => (
                   {/* User Dashboard */}
                   <Route path="/dashboard" element={<DashboardLayout />}>
                     <Route index element={<DashboardHome />} />
-                    <Route path="token" element={<TokenPage />} />
+
+                    {/* Admin-only routes */}
+                    <Route
+                      path="token"
+                      element={
+                        <ProtectedRoute requireAdmin>
+                          <TokenPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="members"
+                      element={
+                        <ProtectedRoute requireAdmin>
+                          <MembersPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="downloads"
+                      element={
+                        <ProtectedRoute requireAdmin>
+                          <DownloadsPage />
+                        </ProtectedRoute>
+                      }
+                    />
+
+                    {/* Available to all authenticated users */}
                     <Route path="alerts" element={<AlertsPage />} />
                     <Route path="reports" element={<ReportsPage />} />
                     <Route path="blocklist" element={<BlocklistPage />} />
                     <Route path="whitelist" element={<WhitelistPage />} />
                     <Route path="notifications" element={<NotificationsPage />} />
                     <Route path="settings" element={<SettingsPage />} />
-                    <Route path="downloads" element={<DownloadsPage />} />
                   </Route>
 
                   {/* Admin Dashboard */}
-                  <Route path="/admin" element={<AdminLayout />}>
+                  <Route
+                    path="/admin"
+                    element={
+                      <ProtectedRoute requireAdmin>
+                        <AdminLayout />
+                      </ProtectedRoute>
+                    }
+                  >
                     <Route index element={<AdminHome />} />
                     <Route path="users" element={<AdminUsers />} />
                     <Route path="system" element={<AdminSystemHealth />} />

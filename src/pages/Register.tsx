@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { authAPI } from '@/services/api';
+import { authAPI, locationsAPI } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
 
 const plans = [
@@ -38,6 +38,30 @@ export default function Register() {
     password: '',
     confirmPassword: '',
   });
+
+  const [countries, setCountries] = useState<Array<{ id: number; code: string; name: string }>>([]);
+  const [selectedCountry, setSelectedCountry] = useState<string>('');
+
+  const flagFromISO = (code: string) => {
+    if (!code || code.length !== 2) return '';
+    const upper = code.toUpperCase();
+    const first = String.fromCodePoint(127397 + upper.charCodeAt(0));
+    const second = String.fromCodePoint(127397 + upper.charCodeAt(1));
+    return `${first}${second}`;
+  };
+
+  useEffect(() => {
+    // Fetch countries
+    (async () => {
+      try {
+        const res = await locationsAPI.getCountries();
+        const list = (res.countries || []).sort((a, b) => a.name.localeCompare(b.name));
+        setCountries(list);
+      } catch (e) {
+        // Silent failure; country is optional
+      }
+    })();
+  }, []);
 
   const [paymentData, setPaymentData] = useState({
     cardNumber: '',
@@ -108,10 +132,11 @@ export default function Register() {
             billing_address: paymentData.billingAddress,
             city: paymentData.city,
             zip_code: paymentData.zipCode,
-            country: paymentData.country
+            // country moved to signup extras; do not send in payment
           },
           company: signupData.company,
           phone: signupData.phone,
+          country: selectedCountry,
           plan: selectedPlan
         }
       );
@@ -239,6 +264,23 @@ export default function Register() {
                   value={signupData.phone}
                   onChange={handleSignupChange}
                 />
+              </div>
+              {/* Country selection */}
+              <div className="space-y-2">
+                <Label htmlFor="country">Country</Label>
+                <Select value={selectedCountry} onValueChange={setSelectedCountry}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select country" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {countries.map((c) => (
+                      <SelectItem key={c.id} value={c.code}>
+                        <span className="mr-2">{flagFromISO(c.code)}</span>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="company">Company name</Label>
